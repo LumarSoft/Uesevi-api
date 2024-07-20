@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import noticiasRouter from "./routes/noticias.js";
+import dashboardRouter from "./routes/dashboard.js";
 import { pool } from "./db/db.js";
 
 const app = express();
@@ -19,6 +20,8 @@ app.use((req, res, next) => {
 
 // Usa el router para manejar las rutas /noticias
 app.use("/noticias", noticiasRouter);
+
+app.use("/dashboard", dashboardRouter);
 
 app.listen(port, () => {
   console.log(`Servidor escuchando en http://localhost:${port}`);

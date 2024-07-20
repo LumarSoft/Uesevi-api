@@ -1,6 +1,5 @@
 # PRIMERO QUE NADA HACER .ENV
 
-
 Para crear un nuevo endpoint
 
 # Paso 1:
