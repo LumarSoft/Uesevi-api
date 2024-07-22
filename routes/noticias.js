@@ -5,7 +5,6 @@ const router = express.Router();
 
 router.get("/", noticiasController.getAll);
 
-// EL METODO POST VA A TENER UN BODY
 router.post("/add-noticia", noticiasController.addNoticia);
 
 router.put("/update-noticia/:id", noticiasController.updateNoticia);
