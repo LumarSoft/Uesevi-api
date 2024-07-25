@@ -3,8 +3,7 @@ import cors from "cors";
 import noticiasRouter from "./routes/noticias.js";
 import dashboardRouter from "./routes/dashboard.js";
 import { pool } from "./db/db.js";
-import http from 'http';
-
+import http from "http";
 
 import loginRouter from "./routes/login.js";
 import empresasRouter from "./routes/empresas.js";
@@ -32,7 +31,6 @@ app.use("/dashboard", dashboardRouter);
 
 app.use("/empresas", empresasRouter);
 
-
 function findAvailablePort(port) {
   const server = http.createServer(app);
 
@@ -40,17 +38,21 @@ function findAvailablePort(port) {
     console.log(`Servidor escuchando en http://localhost:${port}`);
     server.close(() => {
       app.listen(port, () => {
-        console.log(`Servidor realmente escuchando en http://localhost:${port}`);
+        console.log(
+          `Servidor realmente escuchando en http://localhost:${port}`
+        );
       });
     });
   });
 
-  server.on('error', (err) => {
-    if (err.code === 'EADDRINUSE') {
-      console.log(`Puerto ${port} en uso, intentando con el puerto ${port + 1}`);
+  server.on("error", (err) => {
+    if (err.code === "EADDRINUSE") {
+      console.log(
+        `Puerto ${port} en uso, intentando con el puerto ${port + 1}`
+      );
       findAvailablePort(port + 1);
     } else {
-      console.error('Error al intentar usar el puerto:', err);
+      console.error("Error al intentar usar el puerto:", err);
     }
   });
 }

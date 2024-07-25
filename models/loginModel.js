@@ -1,7 +1,6 @@
 import { pool } from "../db/db.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-
 const loginModel = {
   getUser: async (email, password, rol) => {
     try {
