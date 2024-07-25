@@ -32,14 +32,14 @@ const loginModel = {
       // Generar un JWT
       const token = jwt.sign(
         { id: user.id, email: user.email, rol: user.rol },
-        "marce", // Cambia esto a una clave secreta segura
+        process.env.JWT_SECRET,
         { expiresIn: "1h" }
       );
 
-      return { user, token };
+      return { user: { id: user.id, email: user.email, rol: user.rol }, token };
     } catch (err) {
       console.error("Error en la consulta de usuario:", err);
-      return null;
+      throw err;
     }
   },
 };
