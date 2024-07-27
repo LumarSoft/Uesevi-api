@@ -1,15 +1,15 @@
 import { pool } from "../db/db.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+
 const loginModel = {
-  getUser: async (email, password, rol) => {
+  getUser: async (email, password) => {
     try {
-      const query = `SELECT * FROM usuarios WHERE email = ? AND rol = ?`;
-      const [results] = await pool.query(query, [email, rol]);
+      const query = `SELECT * FROM usuarios WHERE email = ?`;
+      const [results] = await pool.query(query, [email]);
 
       if (results.length === 0) {
-        console.log("No se encontró ningún usuario con ese correo electrónico");
-        return null;
+        return { error: true, message: "El correo electrónico no existe" };
       }
 
       const user = results[0];
@@ -24,8 +24,7 @@ const loginModel = {
       const passwordMatch = await bcrypt.compare(password, hashedPassword);
 
       if (!passwordMatch) {
-        console.log("La contraseña no coincide");
-        return null;
+        return { error: true, message: "Contraseña incorrecta" };
       }
 
       // Generar un JWT
