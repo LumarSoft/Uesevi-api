@@ -7,11 +7,13 @@ const empleadosModel = {
     const query = `
       SELECT 
         u.nombre, 
-        u.apellido, 
+        u.apellido,
+        u.email,
         e.cuil, 
         c.created,
         c.empresa_id,
-        empresas.nombre as nombre_empresa
+        empresas.nombre as nombre_empresa,
+        e.sindicato_activo
       FROM 
         usuarios u
       JOIN 
