@@ -1,4 +1,5 @@
 import usuariosAdminModel from "../models/adminInfoModel.js";
+import bcrypt from "bcrypt";
 
 const usuariosAdminController = {
   getAll: async (req, res, next) => {
@@ -28,8 +29,16 @@ const usuariosAdminController = {
   addAdmin: async (req, res, next) => {
     try {
       const userData = req.body;
+      const saltRounds = 10;
+      const hashedPassword = await bcrypt.hash(userData.password, saltRounds);
+      userData.password = hashedPassword;
+
       const result = await usuariosAdminModel.addAdmin(userData);
-      res.json(result);
+      if (result.affectedRows > 0) {
+        res.status(201).json({ message: "Usuario creado", newUser: userData });
+      } else {
+        res.status(400).json({ message: "Error al crear usuario" });
+      }
     } catch (error) {
       next(error);
     }
