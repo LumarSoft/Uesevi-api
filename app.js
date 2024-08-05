@@ -24,7 +24,6 @@ app.use((req, res, next) => {
 });
 
 // Usa el router para manejar las rutas /noticias
-app.use("/noticias", noticiasRouter);
 
 app.use("/login", loginRouter);
 
@@ -32,6 +31,7 @@ app.use("/dashboard", dashboardRouter);
 
 app.use("/empresas", empresasRouter);
 
+app.use("/noticias", noticiasRouter);
 app.use("/administradores", usuariosAdminController);
 
 function findAvailablePort(port) {
