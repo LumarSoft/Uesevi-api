@@ -16,6 +16,22 @@ const noticiasModel = {
 
     return formattedResults;
   },
+
+  getById: async (id) => {
+    const query = `SELECT * FROM noticias WHERE id = ?`;
+
+    const [results] = await pool.query(query, [id]);
+
+    const formattedResults = results.map((result) => ({
+      ...result,
+      created: formatDate(result.created),
+      modified: formatDate(result.modified),
+      cuerpo: formatedHTML(result.cuerpo),
+    }));
+
+    return formattedResults;
+  },
+
   addNoticia: async (titulo, contenido) => {
     const query = `INSERT INTO noticias (titulo, contenido) VALUES (?, ?)`;
 
@@ -27,6 +43,14 @@ const noticiasModel = {
     const query = `UPDATE noticias SET titulo = ?, contenido = ? WHERE id = ?`;
 
     const [results] = await pool.query(query, [titulo, contenido, id]);
+
+    return results;
+  },
+
+  deleteNoticia: async (id) => {
+    const query = `DELETE FROM noticias WHERE id = ?`;
+
+    const [results] = await pool.query(query, [id]);
 
     return results;
   },

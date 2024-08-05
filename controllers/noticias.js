@@ -9,7 +9,17 @@ const noticiasController = {
       next(error);
     }
   },
-  
+
+  getById: async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      const noticia = await noticiasModel.getById(id);
+      res.json(noticia);
+    } catch (error) {
+      next(error);
+    }
+  },
+
   addNoticia: async (req, res, next) => {
     try {
       const { titulo, contenido } = req.body;
@@ -25,6 +35,16 @@ const noticiasController = {
       const { id } = req.params;
       const { titulo, contenido } = req.body;
       const result = await noticiasModel.updateNoticia(id, titulo, contenido);
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  deleteNoticia: async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      const result = await noticiasModel.deleteNoticia(id);
       res.json(result);
     } catch (error) {
       next(error);
