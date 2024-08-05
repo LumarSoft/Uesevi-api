@@ -8,6 +8,7 @@ import http from "http";
 import loginRouter from "./routes/login.js";
 import empresasRouter from "./routes/empresas.js";
 import usuariosAdminController from "./routes/adminInfo.js";
+import escalasRouter from "./routes/escalas.js";
 
 const app = express();
 const startingPort = 3006;
@@ -33,6 +34,8 @@ app.use("/dashboard", dashboardRouter);
 app.use("/empresas", empresasRouter);
 
 app.use("/administradores", usuariosAdminController);
+
+app.use("/escalas", escalasRouter);
 
 function findAvailablePort(port) {
   const server = http.createServer(app);
