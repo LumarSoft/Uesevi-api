@@ -9,6 +9,7 @@ import loginRouter from "./routes/login.js";
 import empresasRouter from "./routes/empresas.js";
 import usuariosAdminController from "./routes/adminInfo.js";
 import escalasRouter from "./routes/escalas.js";
+import formularioRouter from "./routes/formulario.js"
 
 const app = express();
 const startingPort = 3006;
@@ -34,6 +35,8 @@ app.use("/empresas", empresasRouter);
 
 app.use("/noticias", noticiasRouter);
 app.use("/administradores", usuariosAdminController);
+
+app.use("/formulario", formularioRouter)
 
 app.use("/escalas", escalasRouter);
 
