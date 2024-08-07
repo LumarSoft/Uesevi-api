@@ -4,6 +4,8 @@ import noticiasRouter from "./routes/noticias.js";
 import dashboardRouter from "./routes/dashboard.js";
 import { pool } from "./db/db.js";
 import http from "http";
+import multer from 'multer';
+
 
 import loginRouter from "./routes/login.js";
 import empresasRouter from "./routes/empresas.js";
@@ -24,6 +26,8 @@ app.use((req, res, next) => {
   next();
 });
 
+
+
 // Usa el router para manejar las rutas /noticias
 
 app.use("/login", loginRouter);
@@ -33,6 +37,7 @@ app.use("/dashboard", dashboardRouter);
 app.use("/empresas", empresasRouter);
 
 app.use("/noticias", noticiasRouter);
+
 app.use("/administradores", usuariosAdminController);
 
 app.use("/escalas", escalasRouter);

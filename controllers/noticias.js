@@ -22,8 +22,20 @@ const noticiasController = {
 
   addNoticia: async (req, res, next) => {
     try {
-      const { titulo, contenido } = req.body;
-      const result = await noticiasModel.addNoticia(titulo, contenido);
+      const { headline, epigraph, entradilla, body } = req.body;
+      const images = req.files["images"]
+        ? req.files["images"].map((file) => file.path)
+        : [];
+      const pdf = req.files["pdf"] ? req.files["pdf"][0].path : null;
+
+      const result = await noticiasModel.addNoticia({
+        headline,
+        epigraph,
+        entradilla,
+        body,
+        images,
+        pdf,
+      });
       res.json(result);
     } catch (error) {
       next(error);
@@ -33,8 +45,13 @@ const noticiasController = {
   updateNoticia: async (req, res, next) => {
     try {
       const { id } = req.params;
-      const { titulo, contenido } = req.body;
-      const result = await noticiasModel.updateNoticia(id, titulo, contenido);
+      const { headline, epigraph, entradilla, body } = req.body;
+      const result = await noticiasModel.updateNoticia(id, {
+        headline,
+        epigraph,
+        entradilla,
+        body,
+      });
       res.json(result);
     } catch (error) {
       next(error);
