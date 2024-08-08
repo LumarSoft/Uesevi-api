@@ -22,17 +22,27 @@ const noticiasController = {
 
   addNoticia: async (req, res, next) => {
     try {
-      const { headline, epigraph, entradilla, body } = req.body;
+      const { titulo, epigrafe, cuerpo, cuerpo2, destinatario } = req.body;
+
+      //Validar que llleguen los valores obligatorios: destinatario, titulo,epigrafe, cuerpo
+
+      if (!destinatario || !titulo || !epigrafe || !cuerpo) {
+        const error = new Error("Faltan campos obligatorios");
+        error.httpStatus = 400;
+        throw error;
+      }
+
       const images = req.files["images"]
         ? req.files["images"].map((file) => file.path)
         : [];
       const pdf = req.files["pdf"] ? req.files["pdf"][0].path : null;
 
       const result = await noticiasModel.addNoticia({
-        headline,
-        epigraph,
-        entradilla,
-        body,
+        titulo,
+        epigrafe,
+        cuerpo,
+        cuerpo2,
+        destinatario,
         images,
         pdf,
       });

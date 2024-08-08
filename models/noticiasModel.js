@@ -15,54 +15,65 @@ const noticiasModel = {
   },
 
   getById: async (id) => {
+    //Primero traer toda la info de la tabla noticias dependiendo del id
     const query = "SELECT * FROM noticias WHERE id = ?";
     const [results] = await pool.query(query, [id]);
 
-    return results.map((result) => ({
-      ...result,
-      created: formatDate(result.created),
-      modified: formatDate(result.modified),
-      cuerpo: formatedHTML(result.cuerpo),
-    }));
+    //Luego traer todas las imagenes asociadas a esa noticia
+    const queryImages = "SELECT * FROM imagenes_noticias WHERE noticia_id = ?";
+
+    const [resultsImages] = await pool.query(queryImages, [id]);
+
+    //Luego retornar todo en un mismo objeto
+    return {
+      ...results[0],
+      created: formatDate(results[0].created),
+      modified: formatDate(results[0].modified),
+      cuerpo: formatedHTML(results[0].cuerpo),
+      images: resultsImages,
+    };
   },
 
   addNoticia: async (data) => {
-    //Ejemplo de lo que obtenemos como parametro
-    // {
-    //   headline: 'El marvo',
-    //   epigraph: 'asd',
-    //   entradilla: 'asdasdasd',
-    //   body: 'asddddddddddddddd',
-    //   images: [
-    //     'uploads\\imagenes-noticia\\pixelcut-export.png',
-    //     'uploads\\imagenes-noticia\\Vuvu.jpeg'
-    //   ],
-    //   pdf: 'uploads\\archivos-noticia\\CV.pdf'
-    // }
+    //Primero nos traemos el ultimo id de las noticias presente en la tabla noticias
+    const queryLastId = "SELECT id FROM noticias ORDER BY id DESC LIMIT 1";
+    const [resultsLastId] = await pool.query(queryLastId);
+    const lastId = resultsLastId[0].id;
 
-    const { headline, epigraph, entradilla, body, images, pdf } = data;
+    //Luego nos traemos el ultimo id de las imagenes_noticias presente en la tabla imagenes_noticias
+    const queryLastIdImages =
+      "SELECT id FROM imagenes_noticias ORDER BY id DESC LIMIT 1";
+    const [resultsLastIdImages] = await pool.query(queryLastIdImages);
+    const lastIdImages = resultsLastIdImages[0].id;
 
-    //Crear la noticia en la tabla noticias. El archivo tambien va en la tab;a noticias
+    const query =
+      "INSERT INTO noticias (id, titulo, epigrafe, cuerpo, cuerpo_secundario, destinatario, archivo, created, modified) values (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
 
-    const queryInsertNoticia =
-      "INSERT INTO noticias (headline, epigraph, entradilla, body, pdf) VALUES (?, ?, ?, ?, ?)";
+    const { titulo, epigrafe, cuerpo, cuerpo2, destinatario, pdf } = data;
 
-    const [results] = await pool.query(queryInsertNoticia, [
-      headline,
-      epigraph,
-      entradilla,
-      body,
+    const [results] = await pool.query(query, [
+      lastId + 1,
+      titulo,
+      epigrafe,
+      cuerpo,
+      cuerpo2,
+      destinatario,
       pdf,
     ]);
 
-    // obtener el id
-    const idNoticia = results.insertId;
+    const images = data.images;
 
     const queryInsertImages =
-      "INSERT INTO imagenes_noticias (noticia_id, nombre) VALUES (?, ?)";
+      "INSERT INTO imagenes_noticias (id,noticia_id, nombre) VALUES (?, ?, ?)";
 
-    images.forEach(async (image) => {
-      await pool.query(queryInsertImages, [idNoticia, image]);
+    //Las imagenes pueden ser varias y tienen que sumar 1 en el id dependiendo de la ultima inserccion
+
+    images.forEach(async (image, index) => {
+      await pool.query(queryInsertImages, [
+        lastIdImages + index + 1,
+        lastId + 1,
+        image,
+      ]);
     });
 
     return results;
