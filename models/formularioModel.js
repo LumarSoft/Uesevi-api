@@ -15,7 +15,7 @@ const formularioModel = {
 
     return formattedResults;
   },
-
+  
   //   changeEmpresa: async (id, empresa) => {
   //     try {
   //       const query = `UPDATE`;

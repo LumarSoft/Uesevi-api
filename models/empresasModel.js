@@ -4,7 +4,7 @@ import { formatDate } from "../utils/utils.js";
 
 const empresasModel = {
   getAll: async () => {
-    const query = `SELECT em.*, us.nombre as nombre_usuario, us.apellido, us.telefono as telefono_usuario FROM empresas em INNER JOIN usuarios us ON us.email = em.email_contacto`;
+    const query = `SELECT em.*, us.nombre as nombre_usuario, us.apellido, us.telefono as telefono_usuario FROM empresas em INNER JOIN usuarios us ON us.id = em.usuario_id`;
     const [results] = await pool.query(query);
 
     // Formatea las fechas
