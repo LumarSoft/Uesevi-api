@@ -13,8 +13,8 @@ const formularioController = {
   changeEmpresa: async (req, res, next) => {
     try {
       const { id } = req.params;
-      const { empresa } = req.body;
-      await formularioModel.changeEmpresa(id, empresa);
+      const { empresa_provisoria_nombre } = req.body;
+      await formularioModel.changeEmpresa(id, empresa_provisoria_nombre);
       res.json({ message: "Empresa de formulario actualizada" });
     } catch (error) {
       next(error);

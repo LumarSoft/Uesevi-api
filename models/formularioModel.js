@@ -15,16 +15,18 @@ const formularioModel = {
 
     return formattedResults;
   },
-  
-  //   changeEmpresa: async (id, empresa) => {
-  //     try {
-  //       const query = `UPDATE`;
-  //       const [results] = await pool.query(query, [empresa, id]);
-  //       return results;
-  //     } catch (e) {
-  //       console.error(e);
-  //     }
-  //   },
+
+  changeEmpresa: async (id, empresa) => {
+    try {
+      const query = `UPDATE empleados SET empresa_provisoria_nombre = ? WHERE numero_socio = ?`;
+      
+      const [results] = await pool.query(query, [empresa, id]);
+
+      return results;
+    } catch (error) {
+      console.error(error);
+    }
+  },
 };
 
 export default formularioModel;
