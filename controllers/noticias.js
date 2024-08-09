@@ -55,20 +55,26 @@ const noticiasController = {
   updateNoticia: async (req, res, next) => {
     try {
       const { titulo, epigrafe, cuerpo, cuerpo2, destinatario } = req.body;
-
-
-      // Procesa las imágenes
-      const images = req.files["images"]
-        ? req.files["images"].map((file) => file.path)
-        : [];
-      
-      // Procesa el PDF
-      const pdf = req.files["pdf"] ? req.files["pdf"][0].path : null;
-
-      // Asegúrate de que `req.params.id` esté definido
       const noticiaId = req.params.id;
 
-      // Actualiza la noticia en la base de datos (suponiendo que tengas un modelo para esto)
+      // Procesa las imágenes nuevas
+      const newImages = req.files["images"]
+        ? req.files["images"].map((file) => file.path)
+        : [];
+
+      // Obtén las imágenes existentes
+      const existingNoticia = await noticiasModel.getById(noticiaId);
+      const existingImages = existingNoticia.images || [];
+
+      // Si hay imágenes nuevas, reemplaza las existentes, si no, conserva las antiguas
+      const images = newImages.length > 0 ? newImages : existingImages;
+
+      // Procesa el PDF
+      const pdf = req.files["pdf"]
+        ? req.files["pdf"][0].path
+        : existingNoticia.pdf;
+
+      // Actualiza la noticia en la base de datos
       const result = await noticiasModel.updateNoticia({
         id: noticiaId,
         titulo,

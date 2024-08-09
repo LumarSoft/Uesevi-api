@@ -80,17 +80,15 @@ const noticiasModel = {
   },
 
   updateNoticia: async (data) => {
-    const { titulo, epigrafe, cuerpo, cuerpo2, destinatario, pdf, id, images } =
-      data;
-
-    const queryLastIdImages =
-      "SELECT id FROM imagenes_noticias ORDER BY id DESC LIMIT 1";
+    const { titulo, epigrafe, cuerpo, cuerpo2, destinatario, pdf, id, images } = data;
+  
+    // Consulta para obtener el último id de imágenes
+    const queryLastIdImages = "SELECT id FROM imagenes_noticias ORDER BY id DESC LIMIT 1";
     const [resultsLastIdImages] = await pool.query(queryLastIdImages);
-    const lastIdImages = resultsLastIdImages[0].id;
-
-    const query =
-      "UPDATE noticias SET titulo = ?, epigrafe = ?, cuerpo = ?, cuerpo_secundario = ?, destinatario = ?, archivo = ?, modified = NOW() WHERE id = ?";
-
+    const lastIdImages = resultsLastIdImages.length > 0 ? resultsLastIdImages[0].id : 0;
+  
+    // Actualización de la noticia
+    const query = "UPDATE noticias SET titulo = ?, epigrafe = ?, cuerpo = ?, cuerpo_secundario = ?, destinatario = ?, archivo = ?, modified = NOW() WHERE id = ?";
     const [results] = await pool.query(query, [
       titulo,
       epigrafe,
@@ -100,28 +98,40 @@ const noticiasModel = {
       pdf,
       id,
     ]);
-
-    //Primero eliminamos todas las imagenes asociadas a esa noticia
-    const queryDeleteImages =
-      "DELETE FROM imagenes_noticias WHERE noticia_id = ?";
+  
+    // Eliminación de todas las imágenes asociadas a esta noticia
+    const queryDeleteImages = "DELETE FROM imagenes_noticias WHERE noticia_id = ?";
     await pool.query(queryDeleteImages, [id]);
-
-    //Las imagenes pueden ser varias y tienen que sumar 1 en el id dependiendo de la ultima inserccion
-
-    const queryInsertImages =
-      "INSERT INTO imagenes_noticias (id,noticia_id, nombre) VALUES (?, ?, ?)";
-
-    images.forEach(async (image, index) => {
-      await pool.query(queryInsertImages, [
-        lastIdImages + index + 1,
-        id,
-        image,
-      ]);
-    });
-
+  
+    // Inserción de nuevas imágenes
+    const queryInsertImages = "INSERT INTO imagenes_noticias (id, noticia_id, nombre, created, modified) VALUES (?, ?, ?, NOW(), NOW())";
+  
+    // Verifica si `images` es un array de objetos o de strings
+    if (images.length > 0 && typeof images[0] === 'string') {
+      // Opción 1: Solo rutas de imágenes nuevas
+      images.forEach(async (image, index) => {
+        await pool.query(queryInsertImages, [
+          lastIdImages + index + 1,
+          id,
+          image,
+        ]);
+      });
+    } else if (images.length > 0 && typeof images[0] === 'object') {
+      // Opción 2: Imágenes existentes que deseas conservar
+      images.forEach(async (image) => {
+        await pool.query(queryInsertImages, [
+          image.id,
+          image.noticia_id,
+          image.nombre,
+          image.created,
+          image.modified
+        ]);
+      });
+    }
+  
     return results;
   },
-
+  
   deleteNoticia: async (id) => {
     const query = "DELETE FROM noticias WHERE id = ?";
     const [results] = await pool.query(query, [id]);
