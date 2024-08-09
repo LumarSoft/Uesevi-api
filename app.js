@@ -1,5 +1,8 @@
 import express from "express";
 import cors from "cors";
+import path from "path";
+import { fileURLToPath } from "url";
+
 import noticiasRouter from "./routes/noticias.js";
 import dashboardRouter from "./routes/dashboard.js";
 import { pool } from "./db/db.js";
@@ -16,18 +19,22 @@ import tasasRouter from "./routes/tasas.js";
 const app = express();
 const startingPort = 3006;
 
+// Resuelve __dirname para módulos ES
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 app.use(cors({ origin: "*", methods: ["GET", "POST", "PUT", "DELETE"] }));
 
 // Middleware para parsear el body de las peticiones
 app.use(express.json());
+
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // Middleware para pasar el pool de conexiones a las rutas
 app.use((req, res, next) => {
   req.pool = pool;
   next();
 });
-
-// Usa el router para manejar las rutas /noticias
 
 app.use("/login", loginRouter);
 
