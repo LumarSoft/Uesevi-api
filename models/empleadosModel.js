@@ -6,8 +6,7 @@ const empleadosModel = {
   getAll: async () => {
     const query = `
       SELECT 
-        u.nombre, 
-        u.apellido,
+        CONCAT(u.nombre, ' ', u.apellido) AS nombre,
         u.email,
         e.cuil, 
         c.created,
