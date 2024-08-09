@@ -10,11 +10,12 @@ import http from "http";
 
 import loginRouter from "./routes/login.js";
 import empresasRouter from "./routes/empresas.js";
-import empleadosRouter from "./routes/empleados.js"
+import empleadosRouter from "./routes/empleados.js";
 import usuariosAdminController from "./routes/adminInfo.js";
 import escalasRouter from "./routes/escalas.js";
-import formularioRouter from "./routes/formulario.js"
+import formularioRouter from "./routes/formulario.js";
 import tasasRouter from "./routes/tasas.js";
+import categoriasRouter from "./routes/categorias.js";
 
 const app = express();
 const startingPort = 3006;
@@ -42,17 +43,19 @@ app.use("/dashboard", dashboardRouter);
 
 app.use("/empresas", empresasRouter);
 
-app.use("/empleados", empleadosRouter)
+app.use("/empleados", empleadosRouter);
 
 app.use("/noticias", noticiasRouter);
 
 app.use("/administradores", usuariosAdminController);
 
-app.use("/formulario", formularioRouter)
+app.use("/formulario", formularioRouter);
 
 app.use("/escalas", escalasRouter);
 
 app.use("/tasas", tasasRouter);
+
+app.use("/categorias", categoriasRouter);
 
 function findAvailablePort(port) {
   const server = http.createServer(app);
