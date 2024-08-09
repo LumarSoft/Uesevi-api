@@ -7,6 +7,7 @@ import http from "http";
 
 import loginRouter from "./routes/login.js";
 import empresasRouter from "./routes/empresas.js";
+import empleadosRouter from "./routes/empleados.js"
 import usuariosAdminController from "./routes/adminInfo.js";
 import escalasRouter from "./routes/escalas.js";
 
@@ -32,7 +33,10 @@ app.use("/dashboard", dashboardRouter);
 
 app.use("/empresas", empresasRouter);
 
+app.use("/empleados", empleadosRouter)
+
 app.use("/noticias", noticiasRouter);
+
 app.use("/administradores", usuariosAdminController);
 
 app.use("/escalas", escalasRouter);
