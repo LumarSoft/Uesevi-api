@@ -5,4 +5,6 @@ const router = express.Router();
 
 router.get("/", tasasController.getAll);
 
+router.put("/update-tasa/:id", tasasController.update);
+
 export default router;

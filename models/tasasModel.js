@@ -1,3 +1,4 @@
+import { set } from "date-fns";
 import { pool } from "../db/db.js";
 import { formatDate } from "../utils/utils.js";
 
@@ -14,6 +15,16 @@ const tasasModel = {
     }));
 
     return formattedResults;
+  },
+
+  update: async (porcentaje) => {
+    const query = `UPDATE tasa SET porcentaje = ?, modified = ?, created = ?;`;
+
+    const now = new Date();
+
+    const [results] = await pool.query(query, [porcentaje, now, now]);
+
+    return results.insertId;
   },
 };
 

@@ -9,6 +9,16 @@ const tasasController = {
       next(error);
     }
   },
+
+  update: async (req, res, next) => {
+    try {
+      const { porcentaje } = req.body;
+      await tasasModel.update(porcentaje);
+      res.json({message: "Tasa actualizada"});
+    } catch (error) {
+      next(error);
+    }
+  },
 };
 
 export default tasasController;
