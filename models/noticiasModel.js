@@ -79,16 +79,45 @@ const noticiasModel = {
     return results;
   },
 
-  updateNoticia: async (id, { headline, epigraph, entradilla, body }) => {
+  updateNoticia: async (data) => {
+    const { titulo, epigrafe, cuerpo, cuerpo2, destinatario, pdf, id, images } =
+      data;
+
+    const queryLastIdImages =
+      "SELECT id FROM imagenes_noticias ORDER BY id DESC LIMIT 1";
+    const [resultsLastIdImages] = await pool.query(queryLastIdImages);
+    const lastIdImages = resultsLastIdImages[0].id;
+
     const query =
-      "UPDATE noticias SET headline = ?, epigraph = ?, entradilla = ?, body = ? WHERE id = ?";
+      "UPDATE noticias SET titulo = ?, epigrafe = ?, cuerpo = ?, cuerpo_secundario = ?, destinatario = ?, archivo = ?, modified = NOW() WHERE id = ?";
+
     const [results] = await pool.query(query, [
-      headline,
-      epigraph,
-      entradilla,
-      body,
+      titulo,
+      epigrafe,
+      cuerpo,
+      cuerpo2,
+      destinatario,
+      pdf,
       id,
     ]);
+
+    //Primero eliminamos todas las imagenes asociadas a esa noticia
+    const queryDeleteImages =
+      "DELETE FROM imagenes_noticias WHERE noticia_id = ?";
+    await pool.query(queryDeleteImages, [id]);
+
+    //Las imagenes pueden ser varias y tienen que sumar 1 en el id dependiendo de la ultima inserccion
+
+    const queryInsertImages =
+      "INSERT INTO imagenes_noticias (id,noticia_id, nombre) VALUES (?, ?, ?)";
+
+    images.forEach(async (image, index) => {
+      await pool.query(queryInsertImages, [
+        lastIdImages + index + 1,
+        id,
+        image,
+      ]);
+    });
 
     return results;
   },

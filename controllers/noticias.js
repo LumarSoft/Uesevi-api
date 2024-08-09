@@ -54,14 +54,32 @@ const noticiasController = {
 
   updateNoticia: async (req, res, next) => {
     try {
-      const { id } = req.params;
-      const { headline, epigraph, entradilla, body } = req.body;
-      const result = await noticiasModel.updateNoticia(id, {
-        headline,
-        epigraph,
-        entradilla,
-        body,
+      const { titulo, epigrafe, cuerpo, cuerpo2, destinatario } = req.body;
+
+
+      // Procesa las imágenes
+      const images = req.files["images"]
+        ? req.files["images"].map((file) => file.path)
+        : [];
+      
+      // Procesa el PDF
+      const pdf = req.files["pdf"] ? req.files["pdf"][0].path : null;
+
+      // Asegúrate de que `req.params.id` esté definido
+      const noticiaId = req.params.id;
+
+      // Actualiza la noticia en la base de datos (suponiendo que tengas un modelo para esto)
+      const result = await noticiasModel.updateNoticia({
+        id: noticiaId,
+        titulo,
+        epigrafe,
+        cuerpo,
+        cuerpo2,
+        destinatario,
+        images,
+        pdf,
       });
+
       res.json(result);
     } catch (error) {
       next(error);
