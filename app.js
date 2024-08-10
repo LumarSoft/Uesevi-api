@@ -17,6 +17,8 @@ import formularioRouter from "./routes/formulario.js";
 import tasasRouter from "./routes/tasas.js";
 import categoriasRouter from "./routes/categorias.js";
 
+import "./cronJobs.js";
+
 const app = express();
 const startingPort = 3006;
 
