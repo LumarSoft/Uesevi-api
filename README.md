@@ -44,3 +44,6 @@ Para crear un nuevo endpoint
                 next(error);
             }
         },
+
+# Paso 4:
+Al instalar nodemon(npm install -g nodemon), ejecutamos la api con *nodemon app.js*

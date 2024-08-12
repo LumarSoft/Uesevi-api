@@ -1,5 +1,8 @@
 import express from "express";
 import cors from "cors";
+import path from "path";
+import { fileURLToPath } from "url";
+
 import noticiasRouter from "./routes/noticias.js";
 import dashboardRouter from "./routes/dashboard.js";
 import { pool } from "./db/db.js";
@@ -7,16 +10,28 @@ import http from "http";
 
 import loginRouter from "./routes/login.js";
 import empresasRouter from "./routes/empresas.js";
+import empleadosRouter from "./routes/empleados.js";
 import usuariosAdminController from "./routes/adminInfo.js";
 import escalasRouter from "./routes/escalas.js";
+import formularioRouter from "./routes/formulario.js";
+import tasasRouter from "./routes/tasas.js";
+import categoriasRouter from "./routes/categorias.js";
+
+import "./cronJobs.js";
 
 const app = express();
 const startingPort = 3006;
+
+// Resuelve __dirname para módulos ES
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 app.use(cors({ origin: "*", methods: ["GET", "POST", "PUT", "DELETE"] }));
 
 // Middleware para parsear el body de las peticiones
 app.use(express.json());
+
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // Middleware para pasar el pool de conexiones a las rutas
 app.use((req, res, next) => {
@@ -24,18 +39,25 @@ app.use((req, res, next) => {
   next();
 });
 
-// Usa el router para manejar las rutas /noticias
-app.use("/noticias", noticiasRouter);
-
 app.use("/login", loginRouter);
 
 app.use("/dashboard", dashboardRouter);
 
 app.use("/empresas", empresasRouter);
 
+app.use("/empleados", empleadosRouter);
+
+app.use("/noticias", noticiasRouter);
+
 app.use("/administradores", usuariosAdminController);
 
+app.use("/formulario", formularioRouter);
+
 app.use("/escalas", escalasRouter);
+
+app.use("/tasas", tasasRouter);
+
+app.use("/categorias", categoriasRouter);
 
 function findAvailablePort(port) {
   const server = http.createServer(app);

@@ -3,7 +3,7 @@ import { format, isValid } from "date-fns";
 
 const usuariosAdminModel = {
   getAll: async () => {
-    const query = `SELECT * FROM usuarios WHERE rol = 'admin'`;
+    const query = `SELECT *, CONCAT(nombre, ' ', apellido) as nombre FROM usuarios WHERE rol = 'admin'`;
 
     const [results] = await pool.query(query);
 
