@@ -19,6 +19,16 @@ const escalasModel = {
       console.error(e);
     }
   },
+
+  update: async (id, escalasData) => {
+    try {
+      const query = `UPDATE archivos SET ? WHERE id = ?;`;
+      const [results] = await pool.query(query, [escalasData, id]);
+      return results;
+    } catch (e) {
+      console.error(e);
+    }
+  },
 };
 
 export default escalasModel;
