@@ -9,6 +9,15 @@ const escalasController = {
       next(error);
     }
   },
+  delete: async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      await escalasModel.delete(id);
+      res.json({ message: "Archivo eliminado" });
+    } catch (error) {
+      next(error);
+    }
+  },
 };
 
 export default escalasController;
