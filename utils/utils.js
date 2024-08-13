@@ -1,8 +1,7 @@
 // utils/dateUtils.js
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import cheerio from "cheerio";
-
+import * as cheerio from "cheerio";
 
 export const formatDate = (dateString) => {
   if (!dateString) {
