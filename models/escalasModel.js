@@ -32,11 +32,15 @@ const escalasModel = {
 
   create: async (escalasData) => {
     try {
-      const query = `INSERT INTO archivos (nombre, imagen, created, modified, status) VALUES (?, ?, NOW(), NOW(), 1);`;
+      const query =
+        "INSERT INTO archivos (id, nombre, imagen,created, modified, status) values (?, ?, ?, NOW(), NOW(), 1);";
+
       const [results] = await pool.query(query, [
+        escalasData.id,
         escalasData.nombre,
-        escalasData.archivo,
+        escalasData.pdf,
       ]);
+
       return results;
     } catch (e) {
       console.error(e);

@@ -1,24 +1,4 @@
 import escalasModel from "../models/escalasModel.js";
-import multer from "multer";
-import path from "path";
-
-const upload = multer({
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => {
-      cb(null, "uploads/escalas");
-    },
-    filename: (req, file, cb) => {
-      cb(null, Date.now() + path.extname(file.originalname));
-    },
-  }),
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype === "application/pdf") {
-      cb(null, true);
-    } else {
-      cb(new Error("Solo se permiten archivos PDF"));
-    }
-  },
-});
 
 const escalasController = {
   getAll: async (req, res, next) => {
@@ -29,6 +9,7 @@ const escalasController = {
       next(error);
     }
   },
+
   delete: async (req, res, next) => {
     try {
       const { id } = req.params;
@@ -58,25 +39,22 @@ const escalasController = {
   },
 
   create: async (req, res, next) => {
-    upload.single("archivo")(req, res, async (err) => {
-      if (err) {
-        return res.status(400).json({ message: err.message });
+    try {
+      const { nombre, id } = req.body;
+      const pdf = req.files["pdf"] ? req.files["pdf"][0].path : null;
+
+      if (!nombre || !pdf) {
+        const error = new Error("Faltan campos obligatorios");
+        error.httpStatus = 400;
+        throw error;
       }
 
-      try {
-        const { nombre } = req.body;
-        const archivo = req.file.filename;
+      const result = await escalasModel.create({ nombre, pdf, id });
 
-        const result = await escalasModel.create({ nombre, archivo });
-
-        res.status(201).json({
-          message: "Escala creada exitosamente",
-          escala: result,
-        });
-      } catch (error) {
-        next(error);
-      }
-    });
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
   },
 };
 export default escalasController;
