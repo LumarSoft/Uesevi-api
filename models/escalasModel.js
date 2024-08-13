@@ -29,6 +29,20 @@ const escalasModel = {
       console.error(e);
     }
   },
+
+  create: async (escalasData) => {
+    try {
+      const query = `INSERT INTO archivos (nombre, imagen, created, modified, status) VALUES (?, ?, NOW(), NOW(), 1);`;
+      const [results] = await pool.query(query, [
+        escalasData.nombre,
+        escalasData.archivo,
+      ]);
+      return results;
+    } catch (e) {
+      console.error(e);
+      throw e;
+    }
+  },
 };
 
 export default escalasModel;

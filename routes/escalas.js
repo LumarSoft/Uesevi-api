@@ -6,4 +6,6 @@ const router = express.Router();
 router.get("/", escalasController.getAll);
 router.delete("/delete/:id", escalasController.delete);
 router.put("/update-escala/:id", escalasController.update);
+router.post("/create", escalasController.create);
+
 export default router;
