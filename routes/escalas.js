@@ -8,7 +8,7 @@ router.get("/", escalasController.getAll);
 
 router.delete("/delete/:id", escalasController.delete);
 
-router.put("/update-escala/:id", escalasController.update);
+router.put("/update-escala/:id", upload.any(), escalasController.update);
 
 router.post(
   "/create",

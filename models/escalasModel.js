@@ -22,7 +22,7 @@ const escalasModel = {
 
   update: async (id, escalasData) => {
     try {
-      const query = `UPDATE archivos SET ? WHERE id = ?;`;
+      const query = `UPDATE archivos SET nombre = ?, modified = NOW() WHERE id = ?`;
       const [results] = await pool.query(query, [escalasData, id]);
       return results;
     } catch (e) {

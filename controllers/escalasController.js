@@ -23,12 +23,12 @@ const escalasController = {
   update: async (req, res, next) => {
     try {
       const { id } = req.params;
-      const escalasData = req.body;
-      const result = await escalasModel.update(id, escalasData);
+      const { nombre } = req.body;
+      const result = await escalasModel.update(id, nombre);
       if (result.affectedRows > 0) {
         res.json({
           message: "Archivo actualizado",
-          updatedEscala: escalasData,
+          updatedEscala: req.body,
         });
       } else {
         res.status(404).json({ message: "Archivo no encontrado" });
