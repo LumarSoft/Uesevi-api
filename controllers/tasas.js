@@ -12,13 +12,15 @@ const tasasController = {
 
   update: async (req, res, next) => {
     try {
-      const { porcentaje } = req.body;
-      await tasasModel.update(porcentaje);
-      res.json({message: "Tasa actualizada"});
+      const { porcentaje } = req.body; // Obtener el campo porcentaje del body
+      const { id } = req.params; // Obtener el ID del parámetro de la URL
+      await tasasModel.update(id, porcentaje); // Pasar el ID y porcentaje al modelo
+      res.json({ message: "Tasa actualizada" });
     } catch (error) {
       next(error);
     }
   },
 };
+
 
 export default tasasController;
