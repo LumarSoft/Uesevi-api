@@ -62,7 +62,7 @@ app.use("/tasas", tasasRouter);
 
 app.use("/categorias", categoriasRouter);
 
-app.use("/declaraciones/viejas", declaracionesViejasRouter)
+app.use("/antiguas", declaracionesViejasRouter)
 
 function findAvailablePort(port) {
   const server = http.createServer(app);
