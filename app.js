@@ -22,7 +22,6 @@ import "./cronJobs.js";
 
 const app = express();
 const startingPort = 3006;
-const upload = multer();
 
 // Resuelve __dirname para módulos ES
 const __filename = fileURLToPath(import.meta.url);
@@ -32,7 +31,6 @@ app.use(cors({ origin: "*", methods: ["GET", "POST", "PUT", "DELETE"] }));
 
 // Middleware para parsear el body de las peticiones
 app.use(express.json());
-app.use(upload.none());
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // Middleware para pasar el pool de conexiones a las rutas
