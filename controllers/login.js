@@ -2,6 +2,7 @@ import loginModel from "../models/loginModel.js";
 
 const loginController = {
   getUser: async (req, res, next) => {
+
     try {
       const { email, password } = req.body;
       const result = await loginModel.getUser(email, password);
