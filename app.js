@@ -18,6 +18,7 @@ import formularioRouter from "./routes/formulario.js";
 import tasasRouter from "./routes/tasas.js";
 import categoriasRouter from "./routes/categorias.js";
 import declaracionesViejasRouter from "./routes/declaracionesViejas.js";
+import declaracionesRouter from "./routes/declaraciones.js";
 
 import "./cronJobs.js";
 
@@ -60,7 +61,9 @@ app.use("/tasas", tasasRouter);
 
 app.use("/categorias", categoriasRouter);
 
-app.use("/antiguas", declaracionesViejasRouter)
+app.use("/antiguas", declaracionesViejasRouter);
+
+app.use("/declaraciones", declaracionesRouter);
 
 function findAvailablePort(port) {
   const server = http.createServer(app);
