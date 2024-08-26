@@ -17,6 +17,7 @@ import escalasRouter from "./routes/escalas.js";
 import formularioRouter from "./routes/formulario.js";
 import tasasRouter from "./routes/tasas.js";
 import categoriasRouter from "./routes/categorias.js";
+import newsRouter from "./routes/news.js";
 
 import "./cronJobs.js";
 
@@ -58,6 +59,8 @@ app.use("/escalas", escalasRouter);
 app.use("/tasas", tasasRouter);
 
 app.use("/categorias", categoriasRouter);
+
+app.use("/ultimasNoticias",newsRouter)
 
 function findAvailablePort(port) {
   const server = http.createServer(app);

@@ -8,7 +8,6 @@ router.get("/", noticiasController.getAll);
 
 router.get("/:id", noticiasController.getById);
 
-router.get("/getLatest", noticiasController.getLatest);
 
 router.post(
   "/add-noticia",
