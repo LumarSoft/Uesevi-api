@@ -101,6 +101,17 @@ const noticiasController = {
       next(error);
     }
   },
+
+  getLatest: async (req, res, next) => {
+    try {
+      const noticias = await noticiasModel.getLatest();
+      res.json(noticias);
+    } catch (error) {
+      next(error);
+    }
+  },
+
+
 };
 
 export default noticiasController;

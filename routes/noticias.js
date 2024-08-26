@@ -8,6 +8,8 @@ router.get("/", noticiasController.getAll);
 
 router.get("/:id", noticiasController.getById);
 
+router.get("/getLatest", noticiasController.getLatest);
+
 router.post(
   "/add-noticia",
   upload.fields([
@@ -26,7 +28,7 @@ router.put(
   noticiasController.updateNoticia
 );
 
-
 router.delete("/delete-noticia/:id", noticiasController.deleteNoticia);
+
 
 export default router;
