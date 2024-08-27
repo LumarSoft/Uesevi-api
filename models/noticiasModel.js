@@ -4,7 +4,7 @@ import { formatDate, formatedHTML } from "../utils/utils.js";
 const noticiasModel = {
   getAll: async () => {
     const query =
-      "SELECT n.* , i.nombre as url from noticias n inner join imagenes_noticias i on n.id = i.noticia_id";
+      "SELECT n.* , i.nombre as url from noticias n inner join imagenes_noticias i on n.id = i.noticia_id ORDER BY n.created DESC";
 
     const [results] = await pool.query(query);
 

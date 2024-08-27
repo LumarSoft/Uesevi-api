@@ -4,7 +4,7 @@ import { formatDate, formatedHTML } from "../utils/utils.js";
 const newsModel = {
   getLatest: async () => {
     const query =
-      "SELECT n.* , i.nombre AS url FROM noticias n INNER JOIN imagenes_noticias i ON n.id = i.noticia_id LIMIT 3";
+      "SELECT n.* , i.nombre AS url FROM noticias n INNER JOIN imagenes_noticias i ON n.id = i.noticia_id ORDER BY n.created DESC LIMIT 3";
     const [results] = await pool.query(query);
 
     return results.map((result) => ({
