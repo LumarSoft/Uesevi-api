@@ -6,7 +6,7 @@ const empleadosModel = {
   getAll: async () => {
     const query = `
      SELECT DISTINCT
-    CONCAT(u.nombre, ' ', u.apellido) AS nombre,
+    CONCAT(u.apellido, ', ', u.nombre) AS nombre,
     u.email,
     e.cuil, 
     c.created,
@@ -36,6 +36,33 @@ WHERE
     }));
 
     return formattedResults;
+  },
+
+  getByEmpresa: async (id) => {
+    const query = `SELECT 
+  CONCAT(apellido,', ',nombre) AS nombre, 
+  id
+FROM 
+  usuarios 
+WHERE 
+  id IN (
+    SELECT 
+      usuario_id 
+    FROM 
+      empleados 
+    WHERE 
+      id IN (
+        SELECT 
+          DISTINCT empleado_id 
+        FROM 
+          contratos 
+        WHERE 
+          empresa_id = ?
+      )
+  );
+`;
+    const [results] = await pool.query(query, [id]);
+    return results;
   },
 };
 

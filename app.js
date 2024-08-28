@@ -12,13 +12,14 @@ import http from "http";
 import loginRouter from "./routes/login.js";
 import empresasRouter from "./routes/empresas.js";
 import empleadosRouter from "./routes/empleados.js";
-import usuariosAdminController from "./routes/adminInfo.js";
+import usuariosRouter from "./routes/adminInfo.js";
 import escalasRouter from "./routes/escalas.js";
 import formularioRouter from "./routes/formulario.js";
 import tasasRouter from "./routes/tasas.js";
 import categoriasRouter from "./routes/categorias.js";
 import declaracionesViejasRouter from "./routes/declaracionesViejas.js";
 import declaracionesRouter from "./routes/declaraciones.js";
+import contratosRouter from "./routes/contratos.js";
 
 import "./cronJobs.js";
 
@@ -51,7 +52,7 @@ app.use("/empleados", empleadosRouter);
 
 app.use("/noticias", noticiasRouter);
 
-app.use("/administradores", usuariosAdminController);
+app.use("/administradores", usuariosRouter);
 
 app.use("/formulario", formularioRouter);
 
@@ -64,6 +65,8 @@ app.use("/categorias", categoriasRouter);
 app.use("/antiguas", declaracionesViejasRouter);
 
 app.use("/declaraciones", declaracionesRouter);
+
+app.use("/contratos", contratosRouter);
 
 function findAvailablePort(port) {
   const server = http.createServer(app);
