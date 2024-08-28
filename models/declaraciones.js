@@ -10,6 +10,16 @@ const declaracionesModel = {
     const [results] = await pool.query(query);
     return results;
   },
+
+  changeState: async (id, state) => {
+    const query = `
+      UPDATE declaraciones_juradas
+      SET estado = ?
+      WHERE id = ?
+    `;
+    const result = await pool.query(query, [state, id]);
+    return result;
+  },
 };
 
 export default declaracionesModel;
