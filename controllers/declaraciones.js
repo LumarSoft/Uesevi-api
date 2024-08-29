@@ -10,6 +10,16 @@ const declaracionesController = {
     }
   },
 
+  getOne: async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      const declaracion = await declaracionesModel.getOne(id);
+      res.json(declaracion);
+    } catch (error) {
+      next(error);
+    }
+  },
+
   changeState: async (req, res, next) => {
     try {
       const { id } = req.params;
