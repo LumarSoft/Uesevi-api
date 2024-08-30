@@ -43,6 +43,79 @@ ORDER BY
     return result[0];
   },
 
+  getInfo: async (idEmpresa, idDeclaracion) => {
+    const query = `SELECT 
+    e.nombre AS nombre_empresa,
+    COUNT(DISTINCT emp.id) AS cantidad_empleados_declaracion,
+    COUNT(DISTINCT CASE WHEN emp.sindicato_activo = 1 THEN emp.id END) AS cantidad_afiliados_declaracion,
+    d.year,
+    d.mes,
+    d.rectificada,
+    d.vencimiento,
+    d.fecha_pago
+FROM 
+    contratos c
+INNER JOIN 
+    empleados emp ON c.empleado_id = emp.id
+INNER JOIN 
+    usuarios u ON emp.usuario_id = u.id
+INNER JOIN 
+    empresas e ON c.empresa_id = e.id
+INNER JOIN 
+    declaraciones_juradas d ON d.id = ?
+WHERE 
+    c.empresa_id = ?
+    AND c.deleted IS NULL`;
+    const [result] = await pool.query(query, [idDeclaracion, idEmpresa]);
+
+    const query2 = `SELECT 
+    CONCAT(u.nombre, ' ', u.apellido) AS nombre_completo, 
+    CASE WHEN emp.sindicato_activo = 1 THEN 'Sí' ELSE 'No' END AS afiliado,
+    emp.cuil,
+    s.sueldo_basico,
+    s.remunerativo_adicional,
+    s.adicional_norem AS suma_no_remunerativa,
+    c2.nombre AS categoria,
+    s.adicional,
+    (s.sueldo_basico + s.remunerativo_adicional + s.adicional_norem + s.adicional) AS total_bruto
+FROM 
+    sueldos s
+INNER JOIN 
+    (SELECT 
+        contrato_id, 
+        MAX(created) AS max_created 
+    FROM 
+        sueldos 
+    GROUP BY 
+        contrato_id) AS max_sueldos 
+    ON s.contrato_id = max_sueldos.contrato_id 
+    AND s.created = max_sueldos.max_created
+INNER JOIN 
+    contratos c ON s.contrato_id = c.id
+INNER JOIN 
+    empleados emp ON c.empleado_id = emp.id
+INNER JOIN 
+    usuarios u ON emp.usuario_id = u.id
+INNER JOIN 
+    categorias c2 ON s.categoria_id = c2.id
+WHERE 
+    c.empresa_id = ?
+    AND c.deleted IS NULL
+    AND u.id IN (
+        SELECT DISTINCT u.id
+        FROM usuarios u
+        INNER JOIN empleados emp ON u.id = emp.usuario_id
+        INNER JOIN contratos c ON emp.id = c.empleado_id
+        WHERE c.empresa_id = ?
+        AND c.deleted IS NULL
+    );
+`;
+
+    const [result2] = await pool.query(query2, [idEmpresa, idEmpresa]);
+
+    return { ...result[0], empleados: result2 };
+  },
+
   getHistory: async (idEmpresa, year, month) => {
     const query = `
       SELECT dj.*, e.nombre AS nombre_empresa, e.cuit AS cuit_empresa

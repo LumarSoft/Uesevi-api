@@ -8,6 +8,8 @@ router.get("/", declaracionesController.getAll);
 
 router.get("/:id", declaracionesController.getOne);
 
+router.get("/getInfo/:idEmpresa/:idDeclaracion", declaracionesController.getInfo);
+
 router.get(
   "/history/:idEmpresa/:year/:month",
   declaracionesController.getHistory

@@ -20,6 +20,16 @@ const declaracionesController = {
     }
   },
 
+  getInfo: async (req, res, next) => {
+    try {
+      const { idEmpresa, idDeclaracion } = req.params;
+      const info = await declaracionesModel.getInfo(idEmpresa, idDeclaracion);
+      res.json(info);
+    } catch (error) {
+      next(error);
+    }
+  },
+
   getHistory: async (req, res, next) => {
     try {
       const { idEmpresa, year, month } = req.params;
