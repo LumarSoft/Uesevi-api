@@ -8,10 +8,21 @@ router.get("/", declaracionesController.getAll);
 
 router.get("/:id", declaracionesController.getOne);
 
+router.get(
+  "/history/:idEmpresa/:year/:month",
+  declaracionesController.getHistory
+);
+
 router.put(
   "/changeState/:id",
   upload.any(),
   declaracionesController.changeState
+);
+
+router.put(
+  "/changeDatePayment/:id",
+  upload.any(),
+  declaracionesController.changeDatePayment
 );
 
 export default router;
