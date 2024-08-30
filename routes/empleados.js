@@ -7,4 +7,6 @@ router.get("/", empleadosController.getAll);
 
 router.get("/getByEmpresa/:id", empleadosController.getByEmpresa);
 
+router.get("/getOldByEmpresa/:id", empleadosController.getOldByEmpresa);
+
 export default router;

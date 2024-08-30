@@ -64,6 +64,33 @@ WHERE
     const [results] = await pool.query(query, [id]);
     return results;
   },
+
+  getOldByEmpresa: async (id) => {
+    const query = `SELECT 
+  CONCAT(apellido,', ',nombre) AS nombre, 
+  id
+FROM 
+  old_usuarios 
+WHERE 
+  id IN (
+    SELECT 
+      old_usuario_id 
+    FROM 
+      old_empleados 
+    WHERE 
+      id IN (
+        SELECT 
+          DISTINCT old_empleado_id 
+        FROM 
+          old_contratos 
+        WHERE 
+          old_empresa_id = ?
+      )
+  );
+`;
+    const [results] = await pool.query(query, [id]);
+    return results;
+  },
 };
 
 export default empleadosModel;

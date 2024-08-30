@@ -20,6 +20,8 @@ import categoriasRouter from "./routes/categorias.js";
 import declaracionesViejasRouter from "./routes/declaracionesViejas.js";
 import declaracionesRouter from "./routes/declaraciones.js";
 import contratosRouter from "./routes/contratos.js";
+import oldContratosRouter from "./routes/oldContratos.js";
+import oldEmpresasRouter from "./routes/oldEmpresas.js";
 
 import "./cronJobs.js";
 
@@ -67,6 +69,10 @@ app.use("/antiguas", declaracionesViejasRouter);
 app.use("/declaraciones", declaracionesRouter);
 
 app.use("/contratos", contratosRouter);
+
+app.use("/old-contratos", oldContratosRouter);
+
+app.use("/old-empresas", oldEmpresasRouter);
 
 function findAvailablePort(port) {
   const server = http.createServer(app);

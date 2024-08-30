@@ -19,6 +19,16 @@ const empleadosController = {
       next(error);
     }
   },
+
+  getOldByEmpresa: async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      const empleados = await empleadosModel.getOldByEmpresa(id);
+      res.json(empleados);
+    } catch (error) {
+      next(error);
+    }
+  },
 };
 
 export default empleadosController;
