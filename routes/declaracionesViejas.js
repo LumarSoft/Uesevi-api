@@ -7,5 +7,7 @@ router.get("/", declaracionesViejasController.getAll);
 
 router.get("/:id", declaracionesViejasController.getOne);
 
+router.get("/getInfo/:idEmpresa/:idDeclaracion", declaracionesViejasController.getInfo);
+
 
 export default router;

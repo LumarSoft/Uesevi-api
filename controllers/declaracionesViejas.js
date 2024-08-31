@@ -19,6 +19,16 @@ const declaracionesViejasController = {
       next(error);
     }
   },
+
+  getInfo: async (req, res, next) => {
+    try {
+      const { idEmpresa, idDeclaracion } = req.params;
+      const info = await declaracionesViejasModel.getInfo(idEmpresa, idDeclaracion);
+      res.json(info);
+    } catch (error) {
+      next(error);
+    }
+  },
 };
 
 export default declaracionesViejasController;
