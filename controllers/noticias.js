@@ -10,6 +10,19 @@ const noticiasController = {
     }
   },
 
+  getAllClient: async (req, res, next) => {
+    try {
+      const { page = 1 } = req.params;
+      const limit = 12;
+      const offset = (page - 1) * limit;
+
+      const noticias = await noticiasModel.getAllClient(offset, limit);
+      res.json(noticias);
+    } catch (error) {
+      next(error);
+    }
+  },
+
   getById: async (req, res, next) => {
     try {
       const { id } = req.params;
@@ -101,10 +114,6 @@ const noticiasController = {
       next(error);
     }
   },
-
- 
-
-
 };
 
 export default noticiasController;

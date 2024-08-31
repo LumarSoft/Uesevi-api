@@ -6,8 +6,9 @@ const router = express.Router();
 
 router.get("/", noticiasController.getAll);
 
-router.get("/:id", noticiasController.getById);
+router.get("/getAllClient/:page",  noticiasController.getAllClient);
 
+router.get("/:id", noticiasController.getById);
 
 router.post(
   "/add-noticia",
@@ -28,6 +29,5 @@ router.put(
 );
 
 router.delete("/delete-noticia/:id", noticiasController.deleteNoticia);
-
 
 export default router;
