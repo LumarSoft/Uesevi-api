@@ -18,14 +18,7 @@ const fileExists = (filePath) => {
 // Configuración de almacenamiento de Multer
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const fileType = file.mimetype.split('/')[0];
-    let folder = 'uploads';
-
-    if (fileType === 'image') {
-      folder = 'uploads/imagenes-noticia';
-    } else if (fileType === 'application') {
-      folder = 'uploads/archivos-noticia';
-    }
+    const folder = 'uploads';
 
     // Asegurarse de que el directorio exista
     ensureDirectoryExistence(path.join(folder, file.originalname));
@@ -34,7 +27,7 @@ const storage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     const filePath = path.join('uploads', file.originalname);
-    
+
     // Verificar si el archivo ya existe y generar un nombre único si es necesario
     let uniqueFileName = file.originalname;
     let counter = 1;
