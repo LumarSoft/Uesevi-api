@@ -1,12 +1,13 @@
 import express from "express";
-import usuariosAdminController from "../controllers/adminInfo.js";
+import AdminController from "../controllers/adminInfo.js";
+import upload from "../multerconfig.js";
 
 const router = express.Router();
 
-router.get("/", usuariosAdminController.getAll);
+router.get("/", AdminController.getAll);
 
-router.put("/update-admin/:id", usuariosAdminController.update);
+router.put("/update-admin/:id", upload.any(), AdminController.update);
 
-router.post("/add-admin", usuariosAdminController.addAdmin);
+router.post("/add-admin", upload.any(), AdminController.addAdmin);
 
 export default router;

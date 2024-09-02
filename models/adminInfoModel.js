@@ -3,7 +3,7 @@ import { format, isValid } from "date-fns";
 
 const usuariosAdminModel = {
   getAll: async () => {
-    const query = `SELECT *, CONCAT(nombre, ' ', apellido) as nombre FROM usuarios WHERE rol = 'admin'`;
+    const query = `SELECT * FROM usuarios WHERE rol = 'admin'`;
 
     const [results] = await pool.query(query);
 
@@ -34,18 +34,29 @@ const usuariosAdminModel = {
         created: formattedCreated,
       };
     });
-
     return formattedResults;
   },
 
   update: async (id, userData) => {
+    const { nombre, apellido, email, telefono } = userData;
     try {
-      const query = `UPDATE usuarios SET ? WHERE id = ?`;
-      const [results] = await pool.query(query, [userData, id]);
+      const query = `UPDATE usuarios SET nombre = ?, apellido = ?, email = ?, telefono = ? WHERE id = ?`;
+      const [results] = await pool.query(query, [
+        nombre,
+        apellido,
+        email,
+        telefono,
+        id,
+      ]);
+
       return results;
     } catch (error) {
       console.error("Error al actualizar usuario:", error);
-      throw error;
+      throw {
+        status: 500,
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Ocurrió un error al actualizar el usuario.",
+      };
     }
   },
 

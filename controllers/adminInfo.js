@@ -1,7 +1,7 @@
 import usuariosAdminModel from "../models/adminInfoModel.js";
 import bcrypt from "bcrypt";
 
-const usuariosAdminController = {
+const AdminController = {
   getAll: async (req, res, next) => {
     try {
       const usuarios = await usuariosAdminModel.getAll();
@@ -14,10 +14,15 @@ const usuariosAdminController = {
   update: async (req, res, next) => {
     try {
       const { id } = req.params;
-      const userData = req.body;
-      const result = await usuariosAdminModel.update(id, userData);
+      const { nombre, apellido, email, telefono } = req.body;
+      const result = await usuariosAdminModel.update(id, {
+        nombre,
+        apellido,
+        email,
+        telefono,
+      });
       if (result.affectedRows > 0) {
-        res.json({ message: "Usuario actualizado", updatedUser: userData });
+        res.json({ message: "Usuario actualizado" });
       } else {
         res.status(404).json({ message: "Usuario no encontrado" });
       }
@@ -27,6 +32,7 @@ const usuariosAdminController = {
   },
 
   addAdmin: async (req, res, next) => {
+    console.log(req.body);
     try {
       const userData = req.body;
       const saltRounds = 10;
@@ -45,4 +51,4 @@ const usuariosAdminController = {
   },
 };
 
-export default usuariosAdminController;
+export default AdminController;
