@@ -21,22 +21,26 @@ const noticiasController = {
   },
 
   addNoticia: async (req, res, next) => {
+    console.log(req.files);
     try {
       const { titulo, epigrafe, cuerpo, cuerpo2, destinatario } = req.body;
 
-      //Validar que llleguen los valores obligatorios: destinatario, titulo,epigrafe, cuerpo
-
+      // Validar que lleguen los valores obligatorios: destinatario, titulo, epigrafe, cuerpo
       if (!destinatario || !titulo || !epigrafe || !cuerpo) {
         const error = new Error("Faltan campos obligatorios");
         error.httpStatus = 400;
         throw error;
       }
 
+      // Guardar solo el nombre del archivo en lugar del path completo
       const images = req.files["images"]
-        ? req.files["images"].map((file) => file.path)
+        ? req.files["images"].map((file) => file.filename)
         : [];
-      const pdf = req.files["pdf"] ? req.files["pdf"][0].path : null;
+      const pdf = req.files["pdf"] ? req.files["pdf"][0].filename : null;
 
+      console.log(images, pdf);
+
+      // Guardar los datos en la base de datos
       const result = await noticiasModel.addNoticia({
         titulo,
         epigrafe,
@@ -46,6 +50,7 @@ const noticiasController = {
         images,
         pdf,
       });
+
       res.json(result);
     } catch (error) {
       next(error);
