@@ -64,7 +64,7 @@ const noticiasController = {
 
       // Procesa las imágenes nuevas
       const newImages = req.files["images"]
-        ? req.files["images"].map((file) => file.path)
+        ? req.files["images"].map((file) => file.filename)
         : [];
 
       // Obtén las imágenes existentes
@@ -76,7 +76,7 @@ const noticiasController = {
 
       // Procesa el PDF
       const pdf = req.files["pdf"]
-        ? req.files["pdf"][0].path
+        ? req.files["pdf"][0].filename
         : existingNoticia.pdf;
 
       // Actualiza la noticia en la base de datos
