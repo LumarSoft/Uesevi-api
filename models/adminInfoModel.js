@@ -1,7 +1,7 @@
 import { pool } from "../db/db.js";
 import { format, isValid } from "date-fns";
 
-const usuariosAdminModel = {
+const AdminModel = {
   getAll: async () => {
     const query = `SELECT *, CONCAT(nombre, ' ', apellido) as nombre FROM usuarios WHERE rol = 'admin'`;
 
@@ -97,4 +97,4 @@ const usuariosAdminModel = {
   },
 };
 
-export default usuariosAdminModel;
+export default AdminModel;
