@@ -32,10 +32,13 @@ const newsController = {
         throw error;
       }
 
+      // Guardar solo el nombre del archivo en lugar del path completo
       const images = req.files["images"]
-        ? req.files["images"].map((file) => file.path)
+        ? req.files["images"].map((file) => file.filename)
         : [];
-      const pdf = req.files["pdf"] ? req.files["pdf"][0].path : null;
+      const pdf = req.files["pdf"] ? req.files["pdf"][0].filename : null;
+
+      console.log(images, pdf);
 
       const result = await newsModel.addNew({
         title,
@@ -46,6 +49,7 @@ const newsController = {
         images,
         pdf,
       });
+
       res.json(result);
     } catch (error) {
       next(error);
@@ -59,7 +63,7 @@ const newsController = {
 
       // Procesa las imágenes nuevas
       const newImages = req.files["images"]
-        ? req.files["images"].map((file) => file.path)
+        ? req.files["images"].map((file) => file.filename)
         : [];
 
       // Obtén las imágenes existentes

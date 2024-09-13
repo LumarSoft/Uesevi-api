@@ -17,7 +17,7 @@ const AdminController = {
       const adminData = req.body;
       const result = await adminModel.update(id, adminData);
       if (result.affectedRows > 0) {
-        res.json({ message: "Usuario actualizado", updatedUser: userData });
+        res.json({ message: "Usuario actualizado" });
       } else {
         res.status(404).json({ message: "Usuario no encontrado" });
       }
@@ -27,6 +27,7 @@ const AdminController = {
   },
 
   addAdmin: async (req, res, next) => {
+    console.log(req.body);
     try {
       const adminData = req.body;
       const saltRounds = 10;
