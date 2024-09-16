@@ -63,7 +63,7 @@ app.use("/rates", ratesRouter);
 
 app.use("/category", categoryRouter);
 
-app.use("/old-Statements", oldStatementsRouter);
+app.use("/old-statements", oldStatementsRouter);
 
 app.use("/statements", statementsRouter);
 

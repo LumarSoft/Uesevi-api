@@ -13,10 +13,10 @@ const rateModel = {
     return formattedResults;
   },
 
-  update: async (id, porcentaje) => {
+  update: async (id, percentage) => {
     const query = `UPDATE tasa SET porcentaje = ?, modified = ? WHERE id = ?;`;
     const now = new Date();
-    const [results] = await pool.query(query, [porcentaje, now, id]);
+    const [results] = await pool.query(query, [percentage, now, id]);
     return results.affectedRows; // Retornar el número de filas afectadas
   },
 };

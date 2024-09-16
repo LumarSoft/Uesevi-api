@@ -44,20 +44,20 @@ const categoryModel = {
     return result;
   },
 
-  editCategory: async (id, nombre, sueldo) => {
+  editCategory: async (id, name, salary) => {
     const query =
       "UPDATE categorias SET nombre = ?, sueldo_basico = ?, modified = NOW() WHERE id = ?";
 
-    const [result] = await pool.query(query, [nombre, sueldo, id]);
+    const [result] = await pool.query(query, [name, salary, id]);
 
     return result;
   },
 
-  futureSalary: async (id, sueldo_futuro, fecha_futuro) => {
+  futureSalary: async (id, futureSalary, dateChange) => {
     const query =
       "UPDATE categorias SET sueldo_futuro = ?, fecha_vigencia = ?, modified = NOW() WHERE id = ?";
 
-    const [result] = await pool.query(query, [sueldo_futuro, fecha_futuro, id]);
+    const [result] = await pool.query(query, [futureSalary, dateChange, id]);
 
     return result;
   },

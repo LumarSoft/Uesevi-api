@@ -37,15 +37,16 @@ const AdminModel = {
     return formattedResults;
   },
 
-  update: async (id, userData) => {
-    const { nombre, apellido, email, telefono } = userData;
+  update: async (id, adminData) => {
+    const { firstName, lastName, email, phone } = adminData;
+    console.log(firstName, lastName, email, phone);
     try {
       const query = `UPDATE usuarios SET nombre = ?, apellido = ?, email = ?, telefono = ? WHERE id = ?`;
       const [results] = await pool.query(query, [
-        nombre,
-        apellido,
+        firstName,
+        lastName,
         email,
-        telefono,
+        phone,
         id,
       ]);
 
@@ -60,8 +61,8 @@ const AdminModel = {
     }
   },
 
-  addAdmin: async (userData) => {
-    const { email, password, nombre, apellido, telefono } = userData;
+  addAdmin: async (adminData) => {
+    const { email, password, firstName, lastName, phone } = adminData;
     try {
       const checkQuery =
         "SELECT COUNT(*) AS count FROM usuarios WHERE email = ?";
@@ -82,9 +83,9 @@ const AdminModel = {
         lastId[0].id + 1,
         email,
         password,
-        nombre,
-        apellido,
-        telefono,
+        firstName,
+        lastName,
+        phone,
         created,
       ]);
 

@@ -22,11 +22,11 @@ const newsController = {
 
   addNew: async (req, res, next) => {
     try {
-      const { title, heading, body, body2, addressee } = req.body;
+      const { headline, epigraph, body, body2, addressee } = req.body;
 
       //Validar que llleguen los valores obligatorios: destinatario, titulo,epigrafe, cuerpo
 
-      if (!title || !heading || !body || !addressee) {
+      if (!headline || !body || !addressee) {
         const error = new Error("Faltan campos obligatorios");
         error.httpStatus = 400;
         throw error;
@@ -41,8 +41,8 @@ const newsController = {
       console.log(images, pdf);
 
       const result = await newsModel.addNew({
-        title,
-        heading,
+        headline,
+        epigraph,
         body,
         body2,
         addressee,
@@ -58,7 +58,7 @@ const newsController = {
 
   updateNew: async (req, res, next) => {
     try {
-      const { title, heading, body, body2, addressee } = req.body;
+      const { headline, epigraph, body, body2, addressee } = req.body;
       const newId = req.params.id;
 
       // Procesa las imágenes nuevas
@@ -79,8 +79,8 @@ const newsController = {
       // Actualiza la noticia en la base de datos
       const result = await newsModel.updateNew({
         id: newId,
-        title,
-        heading,
+        headline,
+        epigraph,
         body,
         body2,
         addressee,

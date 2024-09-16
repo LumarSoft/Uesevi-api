@@ -37,9 +37,9 @@ const categoryController = {
   editCategory: async (req, res, next) => {
     try {
       const { id } = req.params;
-      const { nombre, sueldo } = req.body;
+      const { name, salary } = req.body;
 
-      const result = await categoryModel.editCategory(id, nombre, sueldo);
+      const result = await categoryModel.editCategory(id, name, salary);
 
       res.json(result);
     } catch (error) {
@@ -50,13 +50,12 @@ const categoryController = {
   futureSalary: async (req, res, next) => {
     try {
       const { id } = req.params;
-      const { sueldo_futuro } = req.body;
-      const { fecha_futuro } = req.body;
+      const { futureSalary, dateChange } = req.body;
 
       const result = await categoryModel.futureSalary(
         id,
-        sueldo_futuro,
-        fecha_futuro
+        futureSalary,
+        dateChange
       );
 
       res.json(result);

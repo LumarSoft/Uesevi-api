@@ -27,7 +27,6 @@ const AdminController = {
   },
 
   addAdmin: async (req, res, next) => {
-    console.log(req.body);
     try {
       const adminData = req.body;
       const saltRounds = 10;

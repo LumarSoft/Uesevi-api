@@ -49,12 +49,12 @@ const noticiasModel = {
     const query =
       "INSERT INTO noticias (id, titulo, epigrafe, cuerpo, cuerpo_secundario, destinatario, archivo, created, modified) values (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
 
-    const { title, heading, body, body2, addressee, images, pdf } = data;
+    const { headline, epigraph, body, body2, addressee, images, pdf } = data;
 
     const [results] = await pool.query(query, [
       lastId + 1,
-      title,
-      heading,
+      headline,
+      epigraph,
       body,
       body2,
       addressee,
@@ -78,7 +78,7 @@ const noticiasModel = {
   },
 
   updateNew: async (data) => {
-    const { titulo, epigrafe, cuerpo, cuerpo2, destinatario, pdf, id, images } =
+    const { id, headline, epigraph, body, body2, addressee, images, pdf } =
       data;
 
     // Consulta para obtener el último id de imágenes
@@ -89,14 +89,21 @@ const noticiasModel = {
       resultsLastIdImages.length > 0 ? resultsLastIdImages[0].id : 0;
 
     // Actualización de la noticia
+
+    if (!headline || !body || !addressee) {
+      const error = new Error("Faltan campos obligatorios");
+      error.httpStatus = 400;
+      throw error;
+    }
+    
     const query =
       "UPDATE noticias SET titulo = ?, epigrafe = ?, cuerpo = ?, cuerpo_secundario = ?, destinatario = ?, archivo = ?, modified = NOW() WHERE id = ?";
     const [results] = await pool.query(query, [
-      titulo,
-      epigrafe,
-      cuerpo,
-      cuerpo2,
-      destinatario,
+      headline,
+      epigraph,
+      body,
+      body2,
+      addressee,
       pdf,
       id,
     ]);

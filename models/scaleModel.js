@@ -20,10 +20,10 @@ const scaleModel = {
     }
   },
 
-  update: async (id, escalasData) => {
+  update: async (id, newName) => {
     try {
       const query = `UPDATE archivos SET nombre = ?, modified = NOW() WHERE id = ?`;
-      const [results] = await pool.query(query, [escalasData, id]);
+      const [results] = await pool.query(query, [newName, id]);
       return results;
     } catch (e) {
       console.error(e);
@@ -37,7 +37,7 @@ const scaleModel = {
 
       const [results] = await pool.query(query, [
         escalasData.id,
-        escalasData.nombre,
+        escalasData.name,
         escalasData.pdf,
       ]);
 

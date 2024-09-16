@@ -23,8 +23,8 @@ const scaleController = {
   update: async (req, res, next) => {
     try {
       const { id } = req.params;
-      const { nombre } = req.body;
-      const result = await scaleModel.update(id, nombre);
+      const { name } = req.body;
+      const result = await scaleModel.update(id, name);
       if (result.affectedRows > 0) {
         res.json({
           message: "Archivo actualizado",
@@ -40,16 +40,16 @@ const scaleController = {
 
   create: async (req, res, next) => {
     try {
-      const { nombre, id } = req.body;
+      const { name, id } = req.body;
       const pdf = req.files["pdf"] ? req.files["pdf"][0].path : null;
 
-      if (!nombre || !pdf) {
+      if (!name || !pdf) {
         const error = new Error("Faltan campos obligatorios");
         error.httpStatus = 400;
         throw error;
       }
 
-      const result = await scaleModel.create({ nombre, pdf, id });
+      const result = await scaleModel.create({ name, pdf, id });
 
       res.json(result);
     } catch (error) {
