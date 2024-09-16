@@ -14,6 +14,58 @@ const noticiasModel = {
     }));
   },
 
+  getLastThree: async () => {
+    const query = "SELECT * FROM noticias ORDER BY created DESC LIMIT 3";
+    const [results] = await pool.query(query);
+
+    return results.map((result) => ({
+      ...result,
+      created: formatDate(result.created),
+      modified: formatDate(result.modified),
+      cuerpo: formatedHTML(result.cuerpo),
+    }));
+  },
+
+  getAllClient: async (offset, limit) => {
+    const query = `
+    SELECT 
+      n.*, 
+      GROUP_CONCAT(i.nombre) as images 
+    FROM 
+      noticias n 
+    LEFT JOIN 
+      imagenes_noticias i 
+    ON 
+      n.id = i.noticia_id 
+    GROUP BY 
+      n.id 
+    ORDER BY 
+      n.created DESC 
+    LIMIT ?, ?
+  `;
+
+    const [results] = await pool.query(query, [
+      parseInt(offset),
+      parseInt(limit),
+    ]);
+
+    const countQuery = "SELECT COUNT(*) as total FROM noticias";
+    const [countResult] = await pool.query(countQuery);
+    const totalNoticias = countResult[0].total;
+
+    const totalPages = Math.ceil(totalNoticias / limit);
+
+    return {
+      noticias: results.map((result) => ({
+        ...result,
+        created: formatDate(result.created),
+        modified: formatDate(result.modified),
+        cuerpo: formatedHTML(result.cuerpo),
+      })),
+      totalPages,
+    };
+  },
+
   getById: async (id) => {
     //Primero traer toda la info de la tabla noticias dependiendo del id
     const query = "SELECT * FROM noticias WHERE id = ?";
@@ -95,7 +147,7 @@ const noticiasModel = {
       error.httpStatus = 400;
       throw error;
     }
-    
+
     const query =
       "UPDATE noticias SET titulo = ?, epigrafe = ?, cuerpo = ?, cuerpo_secundario = ?, destinatario = ?, archivo = ?, modified = NOW() WHERE id = ?";
     const [results] = await pool.query(query, [

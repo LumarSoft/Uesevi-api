@@ -10,6 +10,28 @@ const newsController = {
     }
   },
 
+  getLastThree: async (req, res, next) => {
+    try {
+      const news = await newsModel.getLastThree();
+      res.json(news);
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  getAllClient: async (req, res, next) => {
+    try {
+      const { page = 1 } = req.params;
+      const limit = 12;
+      const offset = (page - 1) * limit;
+
+      const noticias = await newsModel.getAllClient(offset, limit);
+      res.json(noticias);
+    } catch (error) {
+      next(error);
+    }
+  },
+
   getById: async (req, res, next) => {
     try {
       const { id } = req.params;

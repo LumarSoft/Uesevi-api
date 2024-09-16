@@ -4,9 +4,11 @@ import upload from "../multerconfig.js";
 
 const router = express.Router();
 
-router.get("/", noticiasController.getAll);
+router.get("/", newsController.getAll);
 
-router.get("/getAllClient/:page",  noticiasController.getAllClient);
+router.get("/getLastThree",newsController.getLastThree);
+
+router.get("/getAllClient/:page",  newsController.getAllClient);
 
 router.get("/:id", newsController.getById);
 
