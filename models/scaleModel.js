@@ -10,6 +10,15 @@ const scaleModel = {
     return results;
   },
 
+  getAllClient: async () => {
+    const query =
+      "SELECT * FROM archivos WHERE status = 1 ORDER BY created DESC;";
+
+    const [results] = await pool.query(query);
+
+    return results;
+  },
+
   delete: async (id) => {
     try {
       const query = `DELETE FROM archivos WHERE id = ?;`;

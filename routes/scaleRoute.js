@@ -6,6 +6,8 @@ const router = express.Router();
 
 router.get("/", scaleController.getAll);
 
+router.get("/getAllClient", scaleController.getAllClient);
+
 router.delete("/delete/:id", scaleController.delete);
 
 router.put("/update-escala/:id", upload.any(), scaleController.update);

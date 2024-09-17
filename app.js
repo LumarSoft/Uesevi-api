@@ -21,6 +21,7 @@ import statementsRouter from "./routes/statementsRoute.js";
 import contractsRouter from "./routes/contractsRoute.js";
 import oldContractsRouter from "./routes/oldContratsRoute.js";
 import oldCompaniesRouter from "./routes/oldCompaniesRoute.js";
+import inquiriesRouter from "./routes/inquiriesRoute.js";
 
 import "./cronJobs.js";
 
@@ -72,6 +73,8 @@ app.use("/contracts", contractsRouter);
 app.use("/old-contracts", oldContractsRouter);
 
 app.use("/old-companies", oldCompaniesRouter);
+
+app.use("/inquiries", inquiriesRouter);
 
 function findAvailablePort(port) {
   const server = http.createServer(app);

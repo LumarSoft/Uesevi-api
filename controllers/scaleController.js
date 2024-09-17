@@ -10,6 +10,15 @@ const scaleController = {
     }
   },
 
+  getAllClient: async (req, res, next) => {
+    try {
+      const escalas = await scaleModel.getAllClient();
+      res.json(escalas);
+    } catch (error) {
+      next(error);
+    }
+  },
+
   delete: async (req, res, next) => {
     try {
       const { id } = req.params;

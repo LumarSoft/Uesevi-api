@@ -10,4 +10,6 @@ router.put("/change-state/:id", upload.any(), companiesController.changeState);
 
 router.delete("/delete/:id", companiesController.delete);
 
+router.post("/create", upload.any(), companiesController.create);
+
 export default router;
