@@ -63,7 +63,7 @@ const companiesModel = {
 
     // Ahora insertamos el usuario
 
-    const queryUsuario = `INSERT INTO usuarios (id,email,password,nombre,apellido,telefono,rol,estado,created,modified) VALUES (?,?,?,?,?,?,?,?,NOW(),NOW())`;
+    const queryUsuario = `INSERT INTO usuarios (id,email,password,nombre,apellido,telefono,rol,created,modified) VALUES (?,?,?,?,?,?,?,NOW(),NOW())`;
     await pool.query(queryUsuario, [
       id,
       username,
@@ -72,7 +72,6 @@ const companiesModel = {
       contactLastName,
       contactPhone,
       "empresa",
-      "Activo",
     ]);
 
     //Por el momento vamos a poner inicialmente en la tabla usuarios el estado de las empresas como "activo" despues vemos si es necesario cambiarlo

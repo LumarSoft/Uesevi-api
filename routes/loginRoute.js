@@ -6,4 +6,6 @@ const router = express.Router();
 
 router.post("/", upload.any(), loginController.getUser);
 
+router.post("/loginEmpresa", upload.any(), loginController.loginEmpresa);
+
 export default router;
