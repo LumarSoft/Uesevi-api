@@ -3,7 +3,32 @@ import { formatDate } from "../utils/utils.js";
 
 const formModel = {
   getAll: async () => {
-    const query = `SELECT e.empresa_provisoria_nombre, e.cuil, u.nombre, u.apellido, u.created, u.email, e.numero_socio, u.estado, e.nacionalidad, e.codigo_postal, e.domicilio, e.fecha_nacimiento, u.telefono FROM empleados e JOIN usuarios u ON e.usuario_id = u.id WHERE e.empresa_provisoria_nombre IS NOT NULL`;
+    const query = `SELECT CONCAT(nombre, ' ', apellido) as nombre, cuil, created, empresa FROM inscripcion`;
+    const [results] = await pool.query(query);
+
+    // Formatea las fechas
+    const formattedResults = results.map((result) => ({
+      ...result,
+      created: formatDate(result.created),
+    }));
+
+    return formattedResults;
+  },
+
+  changeCompany: async (id, empresa) => {
+    try {
+      const query = `UPDATE inscripcion SET empresa = ? WHERE cuil = ?`;
+
+      const [results] = await pool.query(query, [empresa, id]);
+
+      return results;
+    } catch (error) {
+      console.error(error);
+    }
+  },
+
+  getToComplete: async () => {
+    const query = `SELECT * FROM inscripciones WHERE cuil = ?`;
     const [results] = await pool.query(query);
 
     // Formatea las fechas
@@ -14,19 +39,8 @@ const formModel = {
     }));
 
     return formattedResults;
-  },
-
-  changeCompany: async (id, empresa) => {
-    try {
-      const query = `UPDATE empleados SET empresa_provisoria_nombre = ? WHERE numero_socio = ?`;
-
-      const [results] = await pool.query(query, [empresa, id]);
-
-      return results;
-    } catch (error) {
-      console.error(error);
-    }
-  },
+    //Devolver los datos de la persona, para en el front agarrarlos y armar la nueva ficha de inscripcion autocompletada.
+  }
 };
 
 export default formModel;
