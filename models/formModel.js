@@ -3,7 +3,7 @@ import { formatDate } from "../utils/utils.js";
 
 const formModel = {
   getAll: async () => {
-    const query = `SELECT CONCAT(nombre, ' ', apellido) as nombre, cuil, created, empresa FROM inscripcion`;
+    const query = `SELECT * FROM inscripcion`;
     const [results] = await pool.query(query);
 
     // Formatea las fechas
@@ -15,11 +15,11 @@ const formModel = {
     return formattedResults;
   },
 
-  changeCompany: async (id, empresa) => {
+  changeCompany: async (empresa, cuil) => {
     try {
       const query = `UPDATE inscripcion SET empresa = ? WHERE cuil = ?`;
 
-      const [results] = await pool.query(query, [empresa, id]);
+      const [results] = await pool.query(query, [empresa, cuil]);
 
       return results;
     } catch (error) {
@@ -27,19 +27,17 @@ const formModel = {
     }
   },
 
-  getToComplete: async () => {
-    const query = `SELECT * FROM inscripciones WHERE cuil = ?`;
-    const [results] = await pool.query(query);
+  getToComplete: async (cuil) => {
+    const query = `SELECT * FROM inscripcion WHERE cuil = ?`;
+    const [results] = await pool.query(query, cuil);
 
     // Formatea las fechas
     const formattedResults = results.map((result) => ({
       ...result,
       created: formatDate(result.created),
-      fecha_nacimiento: formatDate(result.fecha_nacimiento),
     }));
 
     return formattedResults;
-    //Devolver los datos de la persona, para en el front agarrarlos y armar la nueva ficha de inscripcion autocompletada.
   }
 };
 
