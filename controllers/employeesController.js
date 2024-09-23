@@ -29,6 +29,10 @@ const employeesController = {
       next(error);
     }
   },
+
+  addEmployee: async (req, res, next) => {
+    
+  }
 };
 
 export default employeesController;
