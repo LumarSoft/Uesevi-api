@@ -31,8 +31,44 @@ const employeesController = {
   },
 
   addEmployee: async (req, res, next) => {
-    
-  }
+    try {
+    } catch (error) {}
+  },
+
+  editEmployee: async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      const {
+        firstName,
+        lastName,
+        cuil,
+        category,
+        employmentStatus,
+        unionMembership,
+      } = req.body;
+
+      await employeesModel.editEmployee(
+        id,
+        firstName,
+        lastName,
+        cuil,
+        category,
+        employmentStatus,
+        unionMembership
+      );
+      res.json({ message: "Employee updated" });
+    } catch (error) {}
+  },
+
+  deleteEmployee: async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      await employeesModel.deleteEmployee(id);
+      res.json({ message: "Employee deleted" });
+    } catch (error) {
+      next(error);
+    }
+  },
 };
 
 export default employeesController;
