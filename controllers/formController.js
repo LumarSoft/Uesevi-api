@@ -30,6 +30,15 @@ const formController = {
       next(error);
     }
   },
+
+  createRequest: async (req, res, next) => {
+    try {
+      const data = req.body;
+
+      await formularioModel.createRequest(data);
+      res.json({ message: "Formulario creado" });
+    } catch (error) {}
+  },
 };
 
 export default formController;

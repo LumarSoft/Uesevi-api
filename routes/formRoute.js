@@ -8,6 +8,12 @@ router.get("/", formController.getAll);
 
 router.put("/change-company/:id", upload.any(), formController.changeCompany);
 
-router.get("/get-to-complete/:cuil", upload.any(), formController.getToComplete);
+router.get(
+  "/get-to-complete/:cuil",
+  upload.any(),
+  formController.getToComplete
+);
+
+router.post("/create-request", upload.any(), formController.createRequest);
 
 export default router;
