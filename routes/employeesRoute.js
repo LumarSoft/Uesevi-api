@@ -16,4 +16,10 @@ router.put("/editEmployee/:id", upload.any(), employeesController.editEmployee);
 
 router.put("/deleteEmployee/:id", employeesController.deleteEmployee);
 
+router.post(
+  "/importEmployees",
+  upload.any(),
+  employeesController.importEmployees
+);
+
 export default router;

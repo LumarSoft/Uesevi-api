@@ -137,6 +137,10 @@ WHERE
     const query = "UPDATE usuarios SET deleted = NOW() WHERE id = ?";
     await pool.query(query, [id]);
   },
+
+  importEmployees: async (employees) => {
+    
+  }
 };
 
 export default employeesModel;

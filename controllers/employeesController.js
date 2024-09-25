@@ -69,6 +69,16 @@ const employeesController = {
       next(error);
     }
   },
+
+  importEmployees: async (req, res, next) => {
+    try {
+      const {employees} = req.body;
+      await employeesModel.importEmployees(employees);
+      res.json({ message: "Employees added" });
+    } catch (error) {
+      next(error);
+    }
+  },
 };
 
 export default employeesController;
