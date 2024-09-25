@@ -2,22 +2,26 @@ import express from "express";
 import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
-import multer from "multer";
 
-import noticiasRouter from "./routes/noticias.js";
-import dashboardRouter from "./routes/dashboard.js";
+import newsRouter from "./routes/newsRoute.js";
+import dashboardRouter from "./routes/dashboardRoute.js";
 import { pool } from "./db/db.js";
 import http from "http";
 
-import loginRouter from "./routes/login.js";
-import empresasRouter from "./routes/empresas.js";
-import empleadosRouter from "./routes/empleados.js";
-import usuariosAdminController from "./routes/adminInfo.js";
-import escalasRouter from "./routes/escalas.js";
-import formularioRouter from "./routes/formulario.js";
-import tasasRouter from "./routes/tasas.js";
-import categoriasRouter from "./routes/categorias.js";
-import newsRouter from "./routes/news.js";
+import loginRouter from "./routes/loginRoute.js";
+import companiesRouter from "./routes/companiesRoute.js";
+import employeeRouter from "./routes/employeesRoute.js";
+import adminRouter from "./routes/adminRoute.js";
+import scaleRouter from "./routes/scaleRoute.js";
+import formRouter from "./routes/formRoute.js";
+import ratesRouter from "./routes/ratesRoute.js";
+import categoryRouter from "./routes/categoryRoute.js";
+import oldStatementsRouter from "./routes/oldStatementsRoute.js";
+import statementsRouter from "./routes/statementsRoute.js";
+import contractsRouter from "./routes/contractsRoute.js";
+import oldContractsRouter from "./routes/oldContratsRoute.js";
+import oldCompaniesRouter from "./routes/oldCompaniesRoute.js";
+import inquiriesRouter from "./routes/inquiriesRoute.js";
 
 import "./cronJobs.js";
 
@@ -44,23 +48,33 @@ app.use("/login", loginRouter);
 
 app.use("/dashboard", dashboardRouter);
 
-app.use("/empresas", empresasRouter);
+app.use("/companies", companiesRouter);
 
-app.use("/empleados", empleadosRouter);
+app.use("/employees", employeeRouter);
 
-app.use("/noticias", noticiasRouter);
+app.use("/news", newsRouter);
 
-app.use("/administradores", usuariosAdminController);
+app.use("/administrators", adminRouter);
 
-app.use("/formulario", formularioRouter);
+app.use("/forms", formRouter);
 
-app.use("/escalas", escalasRouter);
+app.use("/scales", scaleRouter);
 
-app.use("/tasas", tasasRouter);
+app.use("/rates", ratesRouter);
 
-app.use("/categorias", categoriasRouter);
+app.use("/category", categoryRouter);
 
-app.use("/ultimasNoticias",newsRouter)
+app.use("/old-statements", oldStatementsRouter);
+
+app.use("/statements", statementsRouter);
+
+app.use("/contracts", contractsRouter);
+
+app.use("/old-contracts", oldContractsRouter);
+
+app.use("/old-companies", oldCompaniesRouter);
+
+app.use("/inquiries", inquiriesRouter);
 
 function findAvailablePort(port) {
   const server = http.createServer(app);

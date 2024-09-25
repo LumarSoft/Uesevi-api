@@ -1,9 +1,9 @@
 import { pool } from "../db/db.js";
 import { format, isValid } from "date-fns";
 
-const usuariosAdminModel = {
+const AdminModel = {
   getAll: async () => {
-    const query = `SELECT *, CONCAT(nombre, ' ', apellido) as nombre FROM usuarios WHERE rol = 'admin'`;
+    const query = `SELECT * FROM usuarios WHERE rol = 'admin'`;
 
     const [results] = await pool.query(query);
 
@@ -34,23 +34,35 @@ const usuariosAdminModel = {
         created: formattedCreated,
       };
     });
-
     return formattedResults;
   },
 
-  update: async (id, userData) => {
+  update: async (id, adminData) => {
+    const { firstName, lastName, email, phone } = adminData;
+    console.log(firstName, lastName, email, phone);
     try {
-      const query = `UPDATE usuarios SET ? WHERE id = ?`;
-      const [results] = await pool.query(query, [userData, id]);
+      const query = `UPDATE usuarios SET nombre = ?, apellido = ?, email = ?, telefono = ? WHERE id = ?`;
+      const [results] = await pool.query(query, [
+        firstName,
+        lastName,
+        email,
+        phone,
+        id,
+      ]);
+
       return results;
     } catch (error) {
       console.error("Error al actualizar usuario:", error);
-      throw error;
+      throw {
+        status: 500,
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Ocurrió un error al actualizar el usuario.",
+      };
     }
   },
 
-  addAdmin: async (userData) => {
-    const { email, password, nombre, apellido, telefono } = userData;
+  addAdmin: async (adminData) => {
+    const { email, password, firstName, lastName, phone } = adminData;
     try {
       const checkQuery =
         "SELECT COUNT(*) AS count FROM usuarios WHERE email = ?";
@@ -71,9 +83,9 @@ const usuariosAdminModel = {
         lastId[0].id + 1,
         email,
         password,
-        nombre,
-        apellido,
-        telefono,
+        firstName,
+        lastName,
+        phone,
         created,
       ]);
 
@@ -97,4 +109,4 @@ const usuariosAdminModel = {
   },
 };
 
-export default usuariosAdminModel;
+export default AdminModel;
