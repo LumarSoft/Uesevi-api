@@ -31,8 +31,32 @@ const employeesController = {
   },
 
   addEmployee: async (req, res, next) => {
-    
-  }
+    try {
+      const {
+        firstName,
+        lastName,
+        cuil,
+        category,
+        employmentStatus,
+        unionAdhesion,
+        email,
+        company,
+      } = req.body;
+      await employeesModel.addEmployee(
+        firstName,
+        lastName,
+        cuil,
+        category,
+        employmentStatus,
+        unionAdhesion,
+        email,
+        company
+      );
+      res.json({ message: "Employee added" });
+    } catch (error) {
+      next(error);
+    }
+  },
 };
 
 export default employeesController;

@@ -91,6 +91,60 @@ WHERE
     const [results] = await pool.query(query, [id]);
     return results;
   },
+  addEmployee: async (
+    firstName,
+    lastName,
+    cuil,
+    category,
+    employmentStatus,
+    unionAdhesion,
+    email
+  ) => {
+    try {
+      // obtener ultimo id de usuario
+      const queryLastId = `SELECT MAX(id) as lastId FROM usuarios`;
+      const [resultsLastId] = await pool.query(queryLastId);
+      const lastId = resultsLastId[0].lastId;
+      // insersion de usario
+      const query = `
+      INSERT INTO usuarios (id, nombre, apellido, email, created, estado, rol) VALUES (?, ?, ?, ?, NOW(), 1, 'empleado');`;
+      const [results] = await pool.query(query, [
+        lastId + 1,
+        firstName,
+        lastName,
+        email,
+      ]);
+
+      // obtener ultimo id de empleado
+      const queryLastIdEmployee = `SELECT MAX(id) as lastId FROM empleados LIMIT 1`;
+      const [resultsLastIdEmployee] = await pool.query(queryLastIdEmployee);
+      const lastIdEmployee = resultsLastIdEmployee[0].lastId;
+      console.log(lastIdEmployee);
+      // insersion de empleado
+      const queryEmployee = `INSERT INTO empleados (id, cuil, usuario_id, categoria_id, sindicato_activo) VALUES (?, ?, ?, ?, ?);`;
+      const [resultsEmployee] = await pool.query(queryEmployee, [
+        lastIdEmployee + 1,
+        cuil,
+        lastId + 1,
+        category,
+        unionAdhesion,
+      ]);
+
+      // insertar en tabla contratos
+      const queryLastIdContract = `SELECT MAX(id) as lastId FROM contratos LIMIT 1`;
+      const [resultsLastIdContract] = await pool.query(queryLastIdContract);
+      const lastIdContract = resultsLastIdContract[0].lastId;
+
+      const queryContract = `INSERT INTO contratos (empleado_id, empresa_id, estado, created) VALUES (?, ?, ?, NOW());`;
+      const [resultsContract] = await pool.query(queryContract, [
+        lastIdContract + 1,
+        1,
+        employmentStatus,
+      ]);
+
+      return [results, resultsEmployee, resultsContract];
+    } catch (error) {}
+  },
 };
 
 export default employeesModel;
