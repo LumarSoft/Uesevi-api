@@ -5,10 +5,11 @@ import { formatDate } from "../utils/utils.js";
 const employeesModel = {
   getAll: async () => {
     const query = `
-     SELECT DISTINCT
+    SELECT DISTINCT
     CONCAT(u.apellido, ', ', u.nombre) AS nombre,
     u.email,
     e.cuil, 
+    e.categoria_id,
     c.created,
     c.empresa_id,
     em.nombre AS nombre_empresa,
@@ -22,8 +23,7 @@ INNER JOIN
 INNER JOIN 
     empresas em ON c.empresa_id = em.id
 WHERE 
-    u.estado = 1 
-    AND u.rol = 'empleado'
+    u.rol = 'empleado'
     AND c.estado = 1 
     AND c.deleted IS NULL;
     `;
@@ -39,30 +39,46 @@ WHERE
   },
 
   getByEmpresa: async (id) => {
-    const query = `SELECT 
-  CONCAT(apellido,', ',nombre) AS nombre, 
-  id
-FROM 
-  usuarios 
-WHERE 
-  id IN (
-    SELECT 
-      usuario_id 
+    const query = `
+    SELECT DISTINCT
+    u.id,
+    u.apellido,
+    u.nombre,
+      u.email,
+      u.telefono,
+      u.estado,
+      e.cuil, 
+      e.domicilio,
+      e.categoria_id,
+      c.created,
+      c.empresa_id,
+      em.nombre AS nombre_empresa,
+      e.sindicato_activo 
     FROM 
-      empleados 
+      usuarios u
+    INNER JOIN 
+      empleados e ON u.id = e.usuario_id
+    INNER JOIN 
+      contratos c ON e.id = c.empleado_id
+    INNER JOIN 
+      empresas em ON c.empresa_id = em.id
     WHERE 
-      id IN (
-        SELECT 
-          DISTINCT empleado_id 
-        FROM 
-          contratos 
-        WHERE 
-          empresa_id = ?
-      )
-  );
-`;
+      u.rol = 'empleado'
+      AND c.estado = 1 
+      AND c.deleted IS NULL
+      AND u.deleted IS NULL
+      AND c.empresa_id = ?;
+    `;
+
     const [results] = await pool.query(query, [id]);
-    return results;
+
+    // Formatea las fechas
+    const formattedResults = results.map((result) => ({
+      ...result,
+      created: formatDate(result.created),
+    }));
+
+    return formattedResults;
   },
 
   getOldByEmpresa: async (id) => {

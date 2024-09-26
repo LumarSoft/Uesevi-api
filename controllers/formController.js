@@ -12,10 +12,20 @@ const formController = {
 
   changeCompany: async (req, res, next) => {
     try {
-      const { id } = req.params;
-      const { company_provisory_name } = req.body;
-      await formularioModel.changeCompany(id, company_provisory_name);
+      const { cuil } = req.params;
+      const { empresa } = req.body;
+      await formularioModel.changeCompany(cuil, empresa);
       res.json({ message: "Empresa de formulario actualizada" });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  getToComplete: async (req, res, next) => {
+    try {
+      const { cuil } = req.params;
+      const formulario = await formularioModel.getToComplete(cuil);
+      res.json(formulario);
     } catch (error) {
       next(error);
     }
