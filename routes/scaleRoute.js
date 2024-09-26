@@ -4,16 +4,16 @@ import upload from "../multerconfig.js";
 
 const router = express.Router();
 
-router.get("/", scaleController.getAll);
+router.get("/", scaleController.getAll); // GET /scales
 
-router.get("/getAllClient", scaleController.getAllClient);
+router.get("/clients", scaleController.getAllClient); // GET /scales/clients
 
-router.delete("/delete/:id", scaleController.delete);
+router.delete("/:id", scaleController.delete); // DELETE /scales/:id
 
-router.put("/update-escala/:id", upload.any(), scaleController.update);
+router.put("/:id", upload.any(), scaleController.update); // PUT /scales/:id
 
 router.post(
-  "/create",
+  "/",
   upload.fields([
     {
       name: "pdf",
@@ -21,6 +21,6 @@ router.post(
     },
   ]),
   scaleController.create
-);
+); // POST /scales
 
 export default router;

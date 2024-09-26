@@ -15,11 +15,11 @@ const formModel = {
     return formattedResults;
   },
 
-  changeCompany: async (empresa, cuil) => {
+  changeCompany: async (empresa, id) => {
     try {
-      const query = `UPDATE inscripcion SET empresa = ? WHERE cuil = ?`;
+      const query = `UPDATE inscripcion SET empresa = ? WHERE id = ?`;
 
-      const [results] = await pool.query(query, [empresa, cuil]);
+      const [results] = await pool.query(query, [empresa, id]);
 
       return results;
     } catch (error) {

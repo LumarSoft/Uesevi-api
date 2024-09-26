@@ -1,12 +1,40 @@
 import categoryModel from "../models/categoryModel.js";
 
+// Función de manejo de errores
+const handleError = (
+  res,
+  error,
+  statusCode = 500,
+  defaultMessage = "Error interno del servidor"
+) => {
+  console.error("Error en el controlador:", error);
+  res.status(statusCode).json({
+    ok: false,
+    status: "error",
+    statusCode,
+    message: defaultMessage,
+    error: error?.message || null, // Detalles del error para depuración
+  });
+};
+
+// Función de respuesta estándar
+const response = (res, data, statusCode = 200, message = "Éxito") => {
+  res.status(statusCode).json({
+    ok: true,
+    status: "success",
+    statusCode,
+    message,
+    data,
+  });
+};
+
 const categoryController = {
   getAll: async (req, res, next) => {
     try {
-      const category = await categoryModel.getAll();
-      res.json(category);
+      const categories = await categoryModel.getAll();
+      response(res, categories, 200, "Categorías obtenidas con éxito");
     } catch (error) {
-      next(error);
+      handleError(res, error);
     }
   },
 
@@ -15,10 +43,9 @@ const categoryController = {
       const { name, salary } = req.body;
 
       const result = await categoryModel.addCategory(name, salary);
-
-      res.json(result);
+      response(res, result, 201, "Categoría agregada con éxito");
     } catch (error) {
-      next(error);
+      handleError(res, error);
     }
   },
 
@@ -27,10 +54,13 @@ const categoryController = {
       const { id } = req.params;
 
       const result = await categoryModel.deleteCategory(id);
-
-      res.json(result);
+      if (result.affectedRows > 0) {
+        response(res, null, 200, "Categoría eliminada con éxito");
+      } else {
+        handleError(res, null, 404, "Categoría no encontrada");
+      }
     } catch (error) {
-      next(error);
+      handleError(res, error);
     }
   },
 
@@ -40,10 +70,13 @@ const categoryController = {
       const { name, salary } = req.body;
 
       const result = await categoryModel.editCategory(id, name, salary);
-
-      res.json(result);
+      if (result.affectedRows > 0) {
+        response(res, null, 200, "Categoría editada con éxito");
+      } else {
+        handleError(res, null, 404, "Categoría no encontrada");
+      }
     } catch (error) {
-      next(error);
+      handleError(res, error);
     }
   },
 
@@ -57,10 +90,13 @@ const categoryController = {
         futureSalary,
         dateChange
       );
-
-      res.json(result);
+      if (result.affectedRows > 0) {
+        response(res, null, 200, "Salario futuro actualizado con éxito");
+      } else {
+        handleError(res, null, 404, "Categoría no encontrada");
+      }
     } catch (error) {
-      next(error);
+      handleError(res, error);
     }
   },
 };

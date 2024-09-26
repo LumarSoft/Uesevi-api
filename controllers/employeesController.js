@@ -1,12 +1,40 @@
 import employeesModel from "../models/employeesModel.js";
 
+// Función de manejo de errores
+const handleError = (
+  res,
+  error,
+  statusCode = 500,
+  defaultMessage = "Error interno del servidor"
+) => {
+  console.error("Error en el controlador:", error);
+  res.status(statusCode).json({
+    ok: false,
+    status: "error",
+    statusCode,
+    message: defaultMessage,
+    error: error?.message || null, // Detalles del error para depuración
+  });
+};
+
+// Función de respuesta estándar
+const response = (res, data, statusCode = 200, message = "Éxito") => {
+  res.status(statusCode).json({
+    ok: true,
+    status: "success",
+    statusCode,
+    message,
+    data,
+  });
+};
+
 const employeesController = {
   getAll: async (req, res, next) => {
     try {
       const employees = await employeesModel.getAll();
-      res.json(employees);
+      response(res, employees, 200, "Empleados obtenidos con éxito");
     } catch (error) {
-      next(error);
+      handleError(res, error);
     }
   },
 
@@ -14,9 +42,9 @@ const employeesController = {
     try {
       const { id } = req.params;
       const employees = await employeesModel.getByEmpresa(id);
-      res.json(employees);
+      response(res, employees, 200, "Empleados por empresa obtenidos con éxito");
     } catch (error) {
-      next(error);
+      handleError(res, error);
     }
   },
 
@@ -24,59 +52,58 @@ const employeesController = {
     try {
       const { id } = req.params;
       const employees = await employeesModel.getOldByEmpresa(id);
-      res.json(employees);
+      response(res, employees, 200, "Empleados antiguos por empresa obtenidos con éxito");
     } catch (error) {
-      next(error);
+      handleError(res, error);
     }
   },
 
   addEmployee: async (req, res, next) => {
     try {
-    } catch (error) {}
+      const { firstName, lastName, cuil, category, employmentStatus, unionMembership } = req.body;
+      const result = await employeesModel.addEmployee(firstName, lastName, cuil, category, employmentStatus, unionMembership);
+      response(res, result, 201, "Empleado agregado con éxito");
+    } catch (error) {
+      handleError(res, error);
+    }
   },
 
   editEmployee: async (req, res, next) => {
     try {
       const { id } = req.params;
-      const {
-        firstName,
-        lastName,
-        cuil,
-        category,
-        employmentStatus,
-        unionMembership,
-      } = req.body;
-
-      await employeesModel.editEmployee(
-        id,
-        firstName,
-        lastName,
-        cuil,
-        category,
-        employmentStatus,
-        unionMembership
-      );
-      res.json({ message: "Employee updated" });
-    } catch (error) {}
+      const { firstName, lastName, cuil, category, employmentStatus, unionMembership } = req.body;
+      const result = await employeesModel.editEmployee(id, firstName, lastName, cuil, category, employmentStatus, unionMembership);
+      if (result.affectedRows > 0) {
+        response(res, null, 200, "Empleado actualizado con éxito");
+      } else {
+        handleError(res, null, 404, "Empleado no encontrado");
+      }
+    } catch (error) {
+      handleError(res, error);
+    }
   },
 
   deleteEmployee: async (req, res, next) => {
     try {
       const { id } = req.params;
-      await employeesModel.deleteEmployee(id);
-      res.json({ message: "Employee deleted" });
+      const result = await employeesModel.deleteEmployee(id);
+      if (result.affectedRows > 0) {
+        response(res, null, 200, "Empleado eliminado con éxito");
+      } else {
+        handleError(res, null, 404, "Empleado no encontrado");
+      }
     } catch (error) {
-      next(error);
+      handleError(res, error);
     }
   },
 
   importEmployees: async (req, res, next) => {
     try {
-      const {employees} = req.body;
-      await employeesModel.importEmployees(employees);
-      res.json({ message: "Employees added" });
+      const { employees } = req.body;
+      const result = await employeesModel.importEmployees(employees);
+      response(res, result, 201, "Empleados importados con éxito");
     } catch (error) {
-      next(error);
+      handleError(res, error);
     }
   },
 };

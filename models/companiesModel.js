@@ -55,48 +55,57 @@ const companiesModel = {
     username,
     password
   ) => {
-    // Primero tenemos que crear el registro en la tabla usuario
-    //Como la tabla usuarios no tiene autoincrement en el Id debemos obtener el ultimo id y sumarle 1
-    const query = `SELECT MAX(id) as id FROM usuarios`;
-    const [results] = await pool.query(query);
-    const id = results[0].id + 1;
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction(); // Inicia la transacción
 
-    // Ahora insertamos el usuario
+      const queryLastIdUsuario = `SELECT id FROM usuarios ORDER BY id DESC LIMIT 1`;
 
-    const queryUsuario = `INSERT INTO usuarios (id,email,password,nombre,apellido,telefono,rol,created,modified) VALUES (?,?,?,?,?,?,?,NOW(),NOW())`;
-    await pool.query(queryUsuario, [
-      id,
-      username,
-      password,
-      contactName,
-      contactLastName,
-      contactPhone,
-      "empresa",
-    ]);
+      const [resultLastIdUsuario] = await connection.query(queryLastIdUsuario);
 
-    //Por el momento vamos a poner inicialmente en la tabla usuarios el estado de las empresas como "activo" despues vemos si es necesario cambiarlo
+      const LastIdUsuario = resultLastIdUsuario[0].id;
 
-    // Ahora insertamos la empresa
-    //Tambien nos tenemos que traer el ultimo id de la tabla empresas
-    const queryEmpresa = `SELECT MAX(id) as id FROM empresas`;
-    const [resultsEmpresa] = await pool.query(queryEmpresa);
-    const idEmpresa = resultsEmpresa[0].id + 1;
+      console.log(LastIdUsuario);
 
-    const queryEmpresaInsert = `INSERT INTO empresas (id,usuario_id,cuit,nombre,domicilio,telefono,ciudad,estado,email_contacto,created,modified) VALUES (
-      ?,?,?,?,?,?,?,?,?,NOW(),NOW())`;
-    await pool.query(queryEmpresaInsert, [
-      idEmpresa,
-      id,
-      cuit,
-      name,
-      address,
-      phone,
-      location,
-      "Pendiente",
-      contactEmail,
-    ]);
+      const queryUsuario = `INSERT INTO usuarios (id,email, password, nombre, apellido, telefono, rol, created, modified) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`;
+      const [resultUsuario] = await connection.query(queryUsuario, [
+        LastIdUsuario + 1,
+        username,
+        password,
+        contactName,
+        contactLastName,
+        contactPhone,
+        "empresa",
+      ]);
 
-    return { message: "Empresa creada" };
+      const queryLastIdEmpresa = `SELECT id FROM empresas ORDER BY id DESC LIMIT 1`;
+
+      const [resultLastIdEmpresa] = await connection.query(queryLastIdEmpresa);
+
+      const LastIdEmpresa = resultLastIdEmpresa[0].id;
+
+      const queryEmpresaInsert = `INSERT INTO empresas (id, usuario_id, cuit, nombre, domicilio, telefono, ciudad, estado, email_contacto, created, modified) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`;
+      await connection.query(queryEmpresaInsert, [
+        LastIdEmpresa + 1,
+        LastIdUsuario + 1,
+        cuit,
+        name,
+        address,
+        phone,
+        location,
+        "Pendiente",
+        contactEmail,
+      ]);
+
+      await connection.commit(); // Confirma la transacción
+      return { message: "Empresa creada exitosamente" };
+    } catch (error) {
+      await connection.rollback(); // Revierte la transacción si hay un error
+      console.error(error);
+      throw new Error("Error al crear la empresa: " + error.message);
+    } finally {
+      connection.release(); // Libera la conexión
+    }
   },
 };
 

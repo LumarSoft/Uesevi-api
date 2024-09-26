@@ -4,20 +4,20 @@ import upload from "../multerconfig.js";
 
 const router = express.Router();
 
-router.get("/", statementsController.getAll);
+router.get("/", statementsController.getAll); // GET /statements
 
-router.get("/:id", statementsController.getOne);
+router.get("/:id", statementsController.getOne); // GET /statements/:id
 
-router.get("/getInfo/:idEmpresa/:idDeclaracion", statementsController.getInfo);
+router.get("/info/:idEmpresa/:idDeclaracion", statementsController.getInfo); // GET /statements/info/:idEmpresa/:idDeclaracion
 
-router.get("/history/:idEmpresa/:year/:month", statementsController.getHistory);
+router.get("/history/:idEmpresa/:year/:month", statementsController.getHistory); // GET /statements/history/:idEmpresa/:year/:month
 
-router.put("/changeState/:id", upload.any(), statementsController.changeState);
+router.put("/:id/state", upload.any(), statementsController.changeState); // PUT /statements/:id/state
 
 router.put(
-  "/changeDatePayment/:id",
+  "/:id/date-payment",
   upload.any(),
   statementsController.changeDatePayment
-);
+); // PUT /statements/:id/date-payment
 
 export default router;

@@ -4,16 +4,12 @@ import upload from "../multerconfig.js";
 
 const router = express.Router();
 
-router.get("/", formController.getAll);
+router.get("/", formController.getAll); // GET /forms
 
-router.put("/change-company/:id", upload.any(), formController.changeCompany);
+router.put("/:id/company", upload.none(), formController.changeCompany); // PUT /forms/:id/company
 
-router.get(
-  "/get-to-complete/:cuil",
-  upload.any(),
-  formController.getToComplete
-);
+router.get("/complete/:cuil", formController.getToComplete); // GET /forms/complete/:cuil
 
-router.post("/create-request", upload.any(), formController.createRequest);
+router.post("/", upload.any(), formController.createRequest); // POST /forms
 
 export default router;
