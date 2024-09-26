@@ -161,6 +161,10 @@ WHERE
       return [results, resultsEmployee, resultsContract];
     } catch (error) {}
   },
+
+  importEmployees: async (employees) => {
+    
+  }
 };
 
 export default employeesModel;

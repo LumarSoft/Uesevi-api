@@ -4,18 +4,18 @@ import upload from "../multerconfig.js";
 
 const router = express.Router();
 
-router.get("/", categoryController.getAll);
+router.get("/", categoryController.getAll); // GET /categories
 
-router.post("/add-category", upload.any(), categoryController.addCategory);
+router.post("/", upload.none(), categoryController.addCategory); // POST /categories
 
-router.delete("/delete-category/:id", categoryController.deleteCategory);
+router.delete("/:id", categoryController.deleteCategory); // DELETE /categories/:id
+
+router.put("/:id", upload.none(), categoryController.editCategory); // PUT /categories/:id
 
 router.put(
-  "/update-category/:id",
-  upload.any(),
-  categoryController.editCategory
-);
-
-router.put("/future-salary/:id", upload.any(), categoryController.futureSalary);
+  "/:id/future-salary",
+  upload.none(),
+  categoryController.futureSalary
+); // PUT /categories/:id/future-salary
 
 export default router;

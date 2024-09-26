@@ -1,12 +1,42 @@
 import statementsModel from "../models/statementsModel.js";
 
+// Función de manejo de errores
+const handleError = (
+  res,
+  error,
+  statusCode = 500,
+  defaultMessage = "Error interno del servidor"
+) => {
+  console.error("Error en el controlador:", error);
+  res.status(statusCode).json({
+    ok: false,
+    data: {
+      status: "error",
+      statusCode,
+      message: defaultMessage,
+      error: error?.message || null,
+    },
+  });
+};
+
+// Función de respuesta estándar
+const response = (res, data, statusCode = 200, message = "Éxito") => {
+  res.status(statusCode).json({
+    ok: true,
+    status: "success",
+    statusCode,
+    message,
+    data,
+  });
+};
+
 const statementsController = {
   getAll: async (req, res, next) => {
     try {
       const declaraciones = await statementsModel.getAll();
-      res.json(declaraciones);
+      response(res, declaraciones, 200, "Declaraciones obtenidas con éxito");
     } catch (error) {
-      next(error);
+      handleError(res, error);
     }
   },
 
@@ -14,9 +44,12 @@ const statementsController = {
     try {
       const { id } = req.params;
       const declaracion = await statementsModel.getOne(id);
-      res.json(declaracion);
+      if (!declaracion) {
+        return response(res, null, 404, "Declaración no encontrada");
+      }
+      response(res, declaracion, 200, "Declaración obtenida con éxito");
     } catch (error) {
-      next(error);
+      handleError(res, error);
     }
   },
 
@@ -24,9 +57,22 @@ const statementsController = {
     try {
       const { idEmpresa, idDeclaracion } = req.params;
       const info = await statementsModel.getInfo(idEmpresa, idDeclaracion);
-      res.json(info);
+      if (!info) {
+        return response(
+          res,
+          null,
+          404,
+          "Información de la declaración no encontrada"
+        );
+      }
+      response(
+        res,
+        info,
+        200,
+        "Información de la declaración obtenida con éxito"
+      );
     } catch (error) {
-      next(error);
+      handleError(res, error);
     }
   },
 
@@ -34,9 +80,14 @@ const statementsController = {
     try {
       const { idEmpresa, year, month } = req.params;
       const history = await statementsModel.getHistory(idEmpresa, year, month);
-      res.json(history);
+      response(
+        res,
+        history,
+        200,
+        "Historial de declaraciones obtenido con éxito"
+      );
     } catch (error) {
-      next(error);
+      handleError(res, error);
     }
   },
 
@@ -44,10 +95,25 @@ const statementsController = {
     try {
       const { id } = req.params;
       const { state } = req.body;
-      await statementsModel.changeState(id, state);
-      res.json({ message: "Estado de la declaración actualizado" });
+
+      // Validación de entrada
+      if (!state) {
+        return handleError(res, null, 400, "El campo 'state' es obligatorio");
+      }
+
+      const result = await statementsModel.changeState(id, state);
+      if (result.affectedRows > 0) {
+        response(
+          res,
+          null,
+          200,
+          "Estado de la declaración actualizado con éxito"
+        );
+      } else {
+        response(res, null, 404, "Declaración no encontrada");
+      }
     } catch (error) {
-      next(error);
+      handleError(res, error);
     }
   },
 
@@ -55,10 +121,20 @@ const statementsController = {
     try {
       const { id } = req.params;
       const { fecha } = req.body;
-      await statementsModel.changeDatePayment(id, fecha);
-      res.json({ message: "Fecha de pago actualizada" });
+
+      // Validación de entrada
+      if (!fecha) {
+        return handleError(res, null, 400, "El campo 'fecha' es obligatorio");
+      }
+
+      const result = await statementsModel.changeDatePayment(id, fecha);
+      if (result.affectedRows > 0) {
+        response(res, null, 200, "Fecha de pago actualizada con éxito");
+      } else {
+        response(res, null, 404, "Declaración no encontrada");
+      }
     } catch (error) {
-      next(error);
+      handleError(res, error);
     }
   },
 };

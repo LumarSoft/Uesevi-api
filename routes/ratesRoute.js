@@ -4,8 +4,8 @@ import upload from "../multerconfig.js";
 
 const router = express.Router();
 
-router.get("/", rateController.getAll);
+router.get("/", rateController.getAll); // GET /rates
 
-router.put("/update-rate/:id", upload.any(), rateController.update);
+router.put("/:id", upload.none(), rateController.update); // PUT /rates/:id
 
 export default router;

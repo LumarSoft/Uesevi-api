@@ -4,16 +4,18 @@ import upload from "../multerconfig.js";
 
 const router = express.Router();
 
-router.get("/", employeesController.getAll);
+router.get("/", employeesController.getAll); // GET /employees
 
-router.get("/getBycompany/:id", employeesController.getByCompany);
+router.get("/company/:id", employeesController.getByCompany); // GET /employees/company/:id
 
-router.get("/get-Old-By-company/:id", employeesController.getOldByCompany);
+router.get("/company/:id/old", employeesController.getOldByCompany); // GET /employees/company/:id/old
 
-router.post("/addEmployee", upload.any(), employeesController.addEmployee);
+router.post("/", upload.any(), employeesController.addEmployee); // POST /employees
 
-router.put("/editEmployee/:id", upload.any(), employeesController.editEmployee);
+router.put("/:id", upload.any(), employeesController.editEmployee); // PUT /employees/:id
 
-router.put("/deleteEmployee/:id", employeesController.deleteEmployee);
+router.delete("/:id", employeesController.deleteEmployee); // DELETE /employees/:id
+
+router.post("/import", upload.any(), employeesController.importEmployees); // POST /employees/import
 
 export default router;

@@ -3,13 +3,10 @@ import oldStatementsController from "../controllers/oldStatementsController.js";
 
 const router = express.Router();
 
-router.get("/", oldStatementsController.getAll);
+router.get("/", oldStatementsController.getAll); // GET /old-statements
 
-router.get("/:id", oldStatementsController.getOne);
+router.get("/:id", oldStatementsController.getOne); // GET /old-statements/:id
 
-router.get(
-  "/getInfo/:idEmpresa/:idDeclaracion",
-  oldStatementsController.getInfo
-);
+router.get("/info/:idEmpresa/:idDeclaracion", oldStatementsController.getInfo); // GET /old-statements/info/:idEmpresa/:idDeclaracion
 
 export default router;

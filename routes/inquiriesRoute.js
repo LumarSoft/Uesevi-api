@@ -4,8 +4,8 @@ import upload from "../multerconfig.js";
 
 const router = express.Router();
 
-router.get("/", inquiriesController.getAllInquiries);
+router.get("/", inquiriesController.getAllInquiries); // GET /inquiries
 
-router.post("/addInquiry", upload.any(), inquiriesController.addInquiry);
+router.post("/", upload.any(), inquiriesController.addInquiry); // POST /inquiries
 
 export default router;
