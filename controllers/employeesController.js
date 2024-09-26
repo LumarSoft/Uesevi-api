@@ -42,7 +42,12 @@ const employeesController = {
     try {
       const { id } = req.params;
       const employees = await employeesModel.getByEmpresa(id);
-      response(res, employees, 200, "Empleados por empresa obtenidos con éxito");
+      response(
+        res,
+        employees,
+        200,
+        "Empleados por empresa obtenidos con éxito"
+      );
     } catch (error) {
       handleError(res, error);
     }
@@ -52,7 +57,12 @@ const employeesController = {
     try {
       const { id } = req.params;
       const employees = await employeesModel.getOldByEmpresa(id);
-      response(res, employees, 200, "Empleados antiguos por empresa obtenidos con éxito");
+      response(
+        res,
+        employees,
+        200,
+        "Empleados antiguos por empresa obtenidos con éxito"
+      );
     } catch (error) {
       handleError(res, error);
     }
@@ -60,19 +70,52 @@ const employeesController = {
 
   addEmployee: async (req, res, next) => {
     try {
-      const { firstName, lastName, cuil, category, employmentStatus, unionMembership } = req.body;
-      const result = await employeesModel.addEmployee(firstName, lastName, cuil, category, employmentStatus, unionMembership);
-      response(res, result, 201, "Empleado agregado con éxito");
+      const {
+        firstName,
+        lastName,
+        cuil,
+        category,
+        employmentStatus,
+        unionAdhesion,
+        email,
+        companyId,
+      } = req.body;
+      await employeesModel.addEmployee(
+        firstName,
+        lastName,
+        cuil,
+        category,
+        employmentStatus,
+        unionAdhesion,
+        email,
+        companyId
+      );
+      res.json({ message: "Employee added" });
     } catch (error) {
-      handleError(res, error);
+      next(error);
     }
   },
 
   editEmployee: async (req, res, next) => {
     try {
       const { id } = req.params;
-      const { firstName, lastName, cuil, category, employmentStatus, unionMembership } = req.body;
-      const result = await employeesModel.editEmployee(id, firstName, lastName, cuil, category, employmentStatus, unionMembership);
+      const {
+        firstName,
+        lastName,
+        cuil,
+        category,
+        employmentStatus,
+        unionMembership,
+      } = req.body;
+      const result = await employeesModel.editEmployee(
+        id,
+        firstName,
+        lastName,
+        cuil,
+        category,
+        employmentStatus,
+        unionMembership
+      );
       if (result.affectedRows > 0) {
         response(res, null, 200, "Empleado actualizado con éxito");
       } else {

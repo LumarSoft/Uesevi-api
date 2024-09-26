@@ -107,6 +107,7 @@ WHERE
     const [results] = await pool.query(query, [id]);
     return results;
   },
+
   addEmployee: async (
     firstName,
     lastName,
@@ -114,7 +115,8 @@ WHERE
     category,
     employmentStatus,
     unionAdhesion,
-    email
+    email,
+    companyId
   ) => {
     try {
       // obtener ultimo id de usuario
@@ -135,7 +137,6 @@ WHERE
       const queryLastIdEmployee = `SELECT MAX(id) as lastId FROM empleados LIMIT 1`;
       const [resultsLastIdEmployee] = await pool.query(queryLastIdEmployee);
       const lastIdEmployee = resultsLastIdEmployee[0].lastId;
-      console.log(lastIdEmployee);
       // insersion de empleado
       const queryEmployee = `INSERT INTO empleados (id, cuil, usuario_id, categoria_id, sindicato_activo) VALUES (?, ?, ?, ?, ?);`;
       const [resultsEmployee] = await pool.query(queryEmployee, [
@@ -151,20 +152,26 @@ WHERE
       const [resultsLastIdContract] = await pool.query(queryLastIdContract);
       const lastIdContract = resultsLastIdContract[0].lastId;
 
-      const queryContract = `INSERT INTO contratos (empleado_id, empresa_id, estado, created) VALUES (?, ?, ?, NOW());`;
+      console.log(
+        lastIdContract + 1,
+        lastIdEmployee + 1,
+        Number(companyId),
+        employmentStatus.toString()
+      );
+
+      const queryContract = `INSERT INTO contratos (id, empleado_id, empresa_id, estado, created) VALUES (?, ?, ?, ?, NOW());`;
       const [resultsContract] = await pool.query(queryContract, [
         lastIdContract + 1,
-        1,
-        employmentStatus,
+        lastIdEmployee + 1,
+        Number(companyId),
+        employmentStatus.toString(),
       ]);
 
       return [results, resultsEmployee, resultsContract];
     } catch (error) {}
   },
 
-  importEmployees: async (employees) => {
-    
-  }
+  importEmployees: async (employees) => {},
 };
 
 export default employeesModel;
