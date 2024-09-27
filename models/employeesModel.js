@@ -41,9 +41,9 @@ WHERE
   getByEmpresa: async (id) => {
     const query = `
     SELECT DISTINCT
-    u.id,
-    u.apellido,
-    u.nombre,
+      u.id,
+      u.apellido,
+      u.nombre,
       u.email,
       u.telefono,
       u.estado,
@@ -64,7 +64,6 @@ WHERE
       empresas em ON c.empresa_id = em.id
     WHERE 
       u.rol = 'empleado'
-      AND c.estado = 1 
       AND c.deleted IS NULL
       AND u.deleted IS NULL
       AND c.empresa_id = ?;
@@ -169,6 +168,41 @@ WHERE
 
       return [results, resultsEmployee, resultsContract];
     } catch (error) {}
+  },
+
+  editEmployee: async (
+    id,
+    firstName,
+    lastName,
+    cuil,
+    category,
+    employmentStatus,
+    unionMembership
+  ) => {
+    // Primerop actualizamos en la tabla usuarios
+    const query =
+      "UPDATE usuarios SET nombre = ?, apellido = ?, estado = ? WHERE id = ?";
+    await pool.query(query, [firstName, lastName, employmentStatus, id]);
+
+    // Luego actualizamos en la tabla empleados
+
+    const query2 =
+      "UPDATE empleados SET cuil = ?, categoria_id = ?, sindicato_activo = ? WHERE usuario_id = ?";
+
+    const [result] = await pool.query(query2, [
+      cuil,
+      category,
+      unionMembership,
+      id,
+    ]);
+
+    return result;
+  },
+
+  deleteEmployee: async (id) => {
+    const query = "UPDATE usuarios SET deleted = NOW() WHERE id = ?";
+    const [result] = await pool.query(query, [id]);
+    return result;
   },
 
   importEmployees: async (employees) => {},

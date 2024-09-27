@@ -10,12 +10,12 @@ router.get("/company/:id", employeesController.getByCompany); // GET /employees/
 
 router.get("/company/:id/old", employeesController.getOldByCompany); // GET /employees/company/:id/old
 
-router.put("/:id", upload.any(), employeesController.editEmployee); // PUT /employees/:id
+router.put("/:id", upload.none(), employeesController.editEmployee); // PUT /employees/:id
 
 router.delete("/:id", employeesController.deleteEmployee); // DELETE /employees/:id
 
-router.post("/", upload.any(), employeesController.addEmployee); // POST /employees
+router.post("/", upload.none(), employeesController.addEmployee); // POST /employees
 
-router.post("/import", upload.any(), employeesController.importEmployees); // POST /employees/import
+router.post("/import", upload.none(), employeesController.importEmployees); // POST /employees/import
 
 export default router;
