@@ -143,7 +143,6 @@ const employeesController = {
   importEmployees: async (req, res, next) => {
     try {
       const { employees, companyId } = req.body;
-      console.log(employees, companyId);
       const result = await employeesModel.importEmployees(employees, companyId);
       response(res, result, 201, "Empleados importados con éxito");
     } catch (error) {

@@ -211,7 +211,7 @@ WHERE
     await connection.beginTransaction();
 
     try {
-      const amount = 0;
+      let amount = 0;
       // Recorremos cada empleado dentro del array de employees
       for (const employee of employees) {
         //Primero validamos si el empleado no exiten en la base de datos
@@ -221,7 +221,7 @@ WHERE
         // Buscamos el id de la categoria, lo vamos a usar encuentre o no encuentre el empleado
         const queryCategoryId = `SELECT id FROM categorias WHERE nombre = ?`;
         const [resultsCategoryId] = await connection.query(queryCategoryId, [
-          employee.categoria,
+          employee.categora,
         ]);
         const categoryId = resultsCategoryId[0].id;
 
@@ -233,13 +233,12 @@ WHERE
           const lastIdUser = resultsLastId[0].lastId;
 
           // Insertamos el usuario
-          const queryInsertUser = `INSERT INTO usuarios (id, nombre, apellido, email, rol, estado, created, modified) VALUES (?, ?, ?, ?, ?, ? NOW(), NOW());`;
+          const queryInsertUser = `INSERT INTO usuarios (id, nombre, apellido, rol, estado, created, modified) VALUES (?, ?, ?, ?, ?, NOW(), NOW());`;
 
           await connection.query(queryInsertUser, [
             lastIdUser + 1,
             employee.nombre,
             employee.apellido,
-            employee.email,
             "empleado",
             1,
           ]);
@@ -252,7 +251,7 @@ WHERE
           const lastIdEmployee = resultsLastIdEmployee[0].lastId;
 
           // Insertamos el empleado
-          const queryInsertEmployee = `INSERT INTO empleados (id, cuil, usuario_id, categoria_id, sindicato_activo, created, modified) VALUES (?, ?, ?, ?, ?, NOW(), NOW());`;
+          const queryInsertEmployee = `INSERT INTO empleados (id, cuil, usuario_id, categoria_id, sindicato_activo) VALUES (?, ?, ?, ?, ?);`;
 
           await connection.query(queryInsertEmployee, [
             lastIdEmployee + 1,
@@ -281,36 +280,25 @@ WHERE
           // Aca tenemos que validar si los datos son diferentes o iguales a los que ya tenemos
           const result = results[0];
 
-          if (
-            result.cuil !== employee.cuil ||
-            result.categoria_id !== categoryId ||
-            result.sindicato_activo !==
-              (employee.adherido_a_sindicato === "Si" ? 1 : 0)
-          ) {
-            // Actualizamos el empleado
-            const queryUpdateEmployee = `UPDATE empleados SET cuil = ?, categoria_id = ?, sindicato_activo = ?, modified = NOW() WHERE id = ?;`;
+          // Actualizamos el empleado
+          const queryUpdateEmployee = `UPDATE empleados SET categoria_id = ?, sindicato_activo = ? WHERE id = ?;`;
+          await connection.query(queryUpdateEmployee, [
+            categoryId,
+            employee.adherido_a_sindicato === "Si" ? 1 : 0,
+            result.id,
+          ]);
 
-            await connection.query(queryUpdateEmployee, [
-              employee.cuil,
-              categoryId,
-              employee.adherido_a_sindicato === "Si" ? 1 : 0,
-              result.id,
-            ]);
+          // Actualizamos el usuario
+          const queryUpdateUser = `UPDATE usuarios SET nombre = ?, apellido = ?, modified = NOW() WHERE id = ?;`;
+          await connection.query(queryUpdateUser, [
+            employee.nombre,
+            employee.apellido,
+            result.usuario_id,
+          ]);
 
-            // Actualizamos el usuario
-            const queryUpdateUser = `UPDATE usuarios SET nombre = ?, apellido = ?, modified = NOW() WHERE id = ?;`;
-
-            await connection.query(queryUpdateUser, [
-              employee.nombre,
-              employee.apellido,
-              result.usuario_id,
-            ]);
-
-            // Tendriamos que ver si es necesario actualizar empresa_id en la tabla contratos
-            const queryUpdateContract = `UPDATE contratos SET empresa_id = ?, modified = NOW() WHERE empleado_id = ?;`;
-
-            await connection.query(queryUpdateContract, [companyId, result.id]);
-          }
+          // Tendriamos que ver si es necesario actualizar empresa_id en la tabla contratos
+          const queryUpdateContract = `UPDATE contratos SET empresa_id = ?, modified = NOW() WHERE empleado_id = ?;`;
+          await connection.query(queryUpdateContract, [companyId, result.id]);
         }
       }
 
@@ -321,14 +309,56 @@ WHERE
       );
       const lastIdDeclaration = resultsLastIdDeclaration[0].lastId;
 
+      let lastDeclarationMonth 
+      let lastDeclarationYear 
+      // Buscamos el mes y el año de la ultima declaracion jurada
+      const queryLastDeclaration = `SELECT mes, year FROM declaraciones_juradas WHERE empresa_id = ? ORDER BY created DESC LIMIT 1`;
+      const [resultsLastDeclaration] = await connection.query(
+        queryLastDeclaration,
+        [companyId]
+      );
+
+      if (resultsLastDeclaration.length === 0) {
+        const currentMonth = new Date().getMonth() + 1;
+        const currentYear = new Date().getFullYear();
+
+        if (currentMonth === 1) {
+          lastDeclarationMonth = 12;
+          lastDeclarationYear = currentYear - 1;
+        } else {
+          lastDeclarationMonth = currentMonth - 1;
+          lastDeclarationYear = currentYear;
+        }
+      } else {
+        lastDeclarationMonth = resultsLastDeclaration[0].mes;
+        lastDeclarationYear = resultsLastDeclaration[0].year;
+      }
+
+
+
+      // Calculamos el último día del mes de la declaración
+      const lastDayOfMonth = new Date(
+        lastDeclarationYear,
+        lastDeclarationMonth,
+        0
+      ).getDate();
+      const dueDate = new Date(
+        lastDeclarationYear,
+        lastDeclarationMonth - 1,
+        lastDayOfMonth
+      );
+
       // Insertamos una nueva declaracion jurada
-      const queryInsertDeclaration = `INSERT INTO declaraciones_juradas (id, fecha, empresa_id, mes, year, importe, sueldo_basico, created, modified) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW());`;
+      const queryInsertDeclaration = `INSERT INTO declaraciones_juradas (id, fecha, empresa_id, mes, year, vencimiento, importe, sueldo_basico, created, modified) VALUES (?, NOW(), ?, ?, ?, ?, ?, ?, NOW(), NOW());`;
       await connection.query(queryInsertDeclaration, [
         lastIdDeclaration + 1,
-        new Date(),
         companyId,
-        new Date().getMonth() + 1,
-        new Date().getFullYear(),
+        lastDeclarationMonth === 12 ? 1 : lastDeclarationMonth + 1,
+        lastDeclarationMonth === 12
+          ? lastDeclarationYear + 1
+          : lastDeclarationYear,
+        // ultimo dia del mes de la declaracion
+        dueDate,
         0,
         0,
       ]);
@@ -336,7 +366,7 @@ WHERE
       // Ahora registramos datos en la tabla sueldos
       for (const employee of employees) {
         // Primero buscar el id del contrato de cada empleado
-        const queryContractId = `SELECT id FROM contratos WHERE empleado_id = (SELECT id FROM empleados WHERE cuil = ?) ORDER BY created DESCLIMIT 1`;
+        const queryContractId = `SELECT id FROM contratos WHERE empleado_id = (SELECT id FROM empleados WHERE cuil = ?) ORDER BY created DESC LIMIT 1`;
         const [resultsContractId] = await connection.query(queryContractId, [
           employee.cuil,
         ]);
@@ -347,17 +377,42 @@ WHERE
         const [resultsLastIdSalary] = await connection.query(queryLastIdSalary);
         const lastIdSalary = resultsLastIdSalary[0].lastId;
 
-        const queryInsertSalary = `INSERT INTO sueldos (id, contrato_id, declaraciones_jurada_id, sueldo_basico, categoria_id, sindicato_activo, created, modified) VALUES (?, ?, ?, ? , ?, ?, now(), now());`;
+        const queryCategoryId = `SELECT id FROM categorias WHERE nombre = ?`;
+        const [resultsCategoryId] = await connection.query(queryCategoryId, [
+          employee.categora,
+        ]);
+        const categoryId = resultsCategoryId[0].id;
 
+        const queryInsertSalary = `INSERT INTO sueldos (id, contrato_id, declaraciones_jurada_id, sueldo_basico, categoria_id, sindicato_activo, created, modified) VALUES (?, ?, ?, ? , ?, ?, now(), now());`;
         await connection.query(queryInsertSalary, [
           lastIdSalary + 1,
           contractId,
           lastIdDeclaration + 1,
-          0,
+          employee.sueldo_bsico,
           categoryId,
           employee.adherido_a_sindicato === "Si" ? 1 : 0,
         ]);
+
+        let total = 0;
+        total = employee.sueldo_bsico + employee.adicional;
+
+        if (employee.adherido_a_sindicato === "Si") {
+          let aportes = total * 0.04;
+          total = total + aportes;
+        } else {
+          let aportes = total * 0.03;
+          total = total + aportes;
+        }
+
+        amount = amount + total;
       }
+
+      // Actualizamos el importe de la declaracion jurada
+      const queryUpdateDeclaration = `UPDATE declaraciones_juradas SET importe = ? WHERE id = ?;`;
+      await connection.query(queryUpdateDeclaration, [
+        amount,
+        lastIdDeclaration + 1,
+      ]);
 
       // Commit de la transacción
       await connection.commit();
