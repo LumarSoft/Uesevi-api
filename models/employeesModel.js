@@ -211,6 +211,14 @@ WHERE
     await connection.beginTransaction();
 
     try {
+      // Hacemos una query para poner el campo deleted a todos los empleados que esten en la empresa en este momento
+      const queryDeleteEmployees = `UPDATE contratos SET deleted = NOW() WHERE empresa_id = ?;`;
+      await connection.query(queryDeleteEmployees, [companyId]);
+
+      // Tambien lo hacemos en la tabla usuarios
+      const queryDeleteUsers = `UPDATE usuarios SET deleted = NOW() WHERE id IN (SELECT usuario_id FROM empleados WHERE id IN (SELECT empleado_id FROM contratos WHERE empresa_id = ?));`;
+      await connection.query(queryDeleteUsers, [companyId]);
+
       let amount = 0;
       // Recorremos cada empleado dentro del array de employees
       for (const employee of employees) {
@@ -309,8 +317,8 @@ WHERE
       );
       const lastIdDeclaration = resultsLastIdDeclaration[0].lastId;
 
-      let lastDeclarationMonth 
-      let lastDeclarationYear 
+      let lastDeclarationMonth;
+      let lastDeclarationYear;
       // Buscamos el mes y el año de la ultima declaracion jurada
       const queryLastDeclaration = `SELECT mes, year FROM declaraciones_juradas WHERE empresa_id = ? ORDER BY created DESC LIMIT 1`;
       const [resultsLastDeclaration] = await connection.query(
@@ -333,8 +341,6 @@ WHERE
         lastDeclarationMonth = resultsLastDeclaration[0].mes;
         lastDeclarationYear = resultsLastDeclaration[0].year;
       }
-
-
 
       // Calculamos el último día del mes de la declaración
       const lastDayOfMonth = new Date(
@@ -406,6 +412,7 @@ WHERE
 
         amount = amount + total;
       }
+
 
       // Actualizamos el importe de la declaracion jurada
       const queryUpdateDeclaration = `UPDATE declaraciones_juradas SET importe = ? WHERE id = ?;`;
