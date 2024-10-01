@@ -400,19 +400,17 @@ WHERE
         ]);
 
         let total = 0;
-        total = employee.sueldo_bsico + employee.adicional;
+        let aportes = 0;
+        total = Number(employee.sueldo_bsico) + Number(employee.adicionales);
 
         if (employee.adherido_a_sindicato === "Si") {
-          let aportes = total * 0.04;
-          total = total + aportes;
+          aportes = total * 0.04;
         } else {
-          let aportes = total * 0.03;
-          total = total + aportes;
+          aportes = total * 0.03;
         }
 
-        amount = amount + total;
+        amount = amount + aportes;
       }
-
 
       // Actualizamos el importe de la declaracion jurada
       const queryUpdateDeclaration = `UPDATE declaraciones_juradas SET importe = ? WHERE id = ?;`;
