@@ -297,7 +297,7 @@ WHERE
           ]);
 
           // Actualizamos el usuario
-          const queryUpdateUser = `UPDATE usuarios SET nombre = ?, apellido = ?, modified = NOW() WHERE id = ?;`;
+          const queryUpdateUser = `UPDATE usuarios SET nombre = ?, apellido = ?, modified = NOW(), deleted = null WHERE id = ?;`;
           await connection.query(queryUpdateUser, [
             employee.nombre,
             employee.apellido,
@@ -305,7 +305,7 @@ WHERE
           ]);
 
           // Tendriamos que ver si es necesario actualizar empresa_id en la tabla contratos
-          const queryUpdateContract = `UPDATE contratos SET empresa_id = ?, modified = NOW() WHERE empleado_id = ?;`;
+          const queryUpdateContract = `UPDATE contratos SET empresa_id = ?, modified = NOW(), deleted = null WHERE empleado_id = ?;`;
           await connection.query(queryUpdateContract, [companyId, result.id]);
         }
       }
@@ -413,8 +413,9 @@ WHERE
       }
 
       // Actualizamos el importe de la declaracion jurada
-      const queryUpdateDeclaration = `UPDATE declaraciones_juradas SET importe = ? WHERE id = ?;`;
+      const queryUpdateDeclaration = `UPDATE declaraciones_juradas SET subtotal = ?, interes = 0, importe = ? WHERE id = ?;`;
       await connection.query(queryUpdateDeclaration, [
+        amount,
         amount,
         lastIdDeclaration + 1,
       ]);

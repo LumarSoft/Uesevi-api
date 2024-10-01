@@ -76,6 +76,18 @@ const statementsController = {
     }
   },
 
+  getStatementsByCompany: async (req, res, next) => {
+    try {
+      const { idCompany } = req.params;
+      const statements = await statementsModel.getStatementsByCompany(
+        idCompany
+      );
+      response(res, statements, 200, "Declaraciones obtenidas con éxito");
+    } catch (error) {
+      handleError(res, error);
+    }
+  },
+
   getHistory: async (req, res, next) => {
     try {
       const { idEmpresa, year, month } = req.params;
@@ -128,8 +140,14 @@ const statementsController = {
       }
 
       const result = await statementsModel.changeDatePayment(id, fecha);
+
       if (result.affectedRows > 0) {
-        response(res, null, 200, "Fecha de pago actualizada con éxito");
+        response(
+          res,
+          null,
+          200,
+          "Fecha de pago de la declaración actualizada con éxito"
+        );
       } else {
         response(res, null, 404, "Declaración no encontrada");
       }
