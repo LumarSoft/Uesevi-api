@@ -22,24 +22,43 @@ const declaracionesViejasModel = {
   },
 
   getInfo: async (idEmpresa, idDeclaracion) => {
-    const query = `SELECT mes, year FROM old_declaraciones_juradas WHERE id = ? AND old_empresa_id = ?`;
+    const query = `SELECT 
+    d.id,
+    e.nombre AS nombre_empresa,
+    COUNT(DISTINCT emp.id) AS cantidad_empleados_declaracion,
+    COUNT(DISTINCT CASE WHEN emp.sindicato_activo = 1 THEN emp.id END) AS cantidad_afiliados_declaracion,
+    d.year,
+    d.mes,
+    d.rectificada
+FROM 
+    old_contratos c
+INNER JOIN 
+    old_empleados emp ON c.old_empleado_id = emp.id
+INNER JOIN 
+    old_usuarios u ON emp.old_usuario_id = u.id
+INNER JOIN 
+    old_empresas e ON c.old_empresa_id = e.id
+INNER JOIN 
+    old_declaraciones_juradas d ON d.id = 638
+WHERE 
+    c.old_empresa_id = 81
+    AND c.deleted IS NULL`;
     const [result] = await pool.query(query, [idDeclaracion, idEmpresa]);
 
     const query2 = `SELECT 
     CONCAT(u.nombre, ' ', u.apellido) AS nombre_completo, 
     CASE WHEN emp.sindicato_activo = 1 THEN 'Sí' ELSE 'No' END AS afiliado,
     emp.cuil,
-    s.monto,
+    s.sueldo_basico,
     c2.nombre AS categoria,
-    c2.sueldo_basico AS sueldo_basico_categoria,
     s.adicional,
-    (s.monto + s.adicional) AS total_bruto
+    (s.sueldo_basico + s.adicional) AS total_bruto
 FROM 
     old_sueldos s
 INNER JOIN 
     (SELECT 
         old_contrato_id, 
-        MAX(created) AS max_created 
+        MAX(created) AS max_created
     FROM 
         old_sueldos 
     GROUP BY 
@@ -59,7 +78,7 @@ WHERE
     AND c.deleted IS NULL
     AND u.id IN (
         SELECT DISTINCT u.id
-        FROM old_usuarios u
+        FROM usuarios u
         INNER JOIN old_empleados emp ON u.id = emp.old_usuario_id
         INNER JOIN old_contratos c ON emp.id = c.old_empleado_id
         WHERE c.old_empresa_id = ?
