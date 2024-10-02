@@ -155,6 +155,22 @@ const statementsController = {
       handleError(res, error);
     }
   },
+
+  rectify: async (req, res, next) => {
+    try {
+      const { employees, companyId, statementId, year, month } = req.body;
+      const result = await statementsModel.rectify(
+        employees,
+        companyId,
+        statementId,
+        year,
+        month
+      );
+      response(res, result, 201, "Declaración rectificada con éxito");
+    } catch (error) {
+      handleError(res, error);
+    }
+  },
 };
 
 export default statementsController;

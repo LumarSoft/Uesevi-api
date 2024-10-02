@@ -389,11 +389,12 @@ WHERE
         ]);
         const categoryId = resultsCategoryId[0].id;
 
-        const queryInsertSalary = `INSERT INTO sueldos (id, contrato_id, declaraciones_jurada_id, sueldo_basico, categoria_id, sindicato_activo, created, modified) VALUES (?, ?, ?, ? , ?, ?, now(), now());`;
+        const queryInsertSalary = `INSERT INTO sueldos (id, contrato_id, declaraciones_jurada_id,adicional, sueldo_basico, categoria_id, sindicato_activo, created, modified) VALUES (?, ?, ?, ?, ? , ?, ?, now(), now());`;
         await connection.query(queryInsertSalary, [
           lastIdSalary + 1,
           contractId,
           lastIdDeclaration + 1,
+          Number(employee.adicionales),
           employee.sueldo_bsico,
           categoryId,
           employee.adherido_a_sindicato === "Si" ? 1 : 0,

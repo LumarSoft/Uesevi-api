@@ -22,4 +22,6 @@ router.put(
   statementsController.changeDatePayment
 ); // PUT /statements/:id/date-payment
 
+router.post("/rectifications", upload.none(), statementsController.rectify); // POST /statements/rectificar
+
 export default router;
