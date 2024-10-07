@@ -7,7 +7,6 @@ const handleError = (
   statusCode = 500,
   defaultMessage = "Error interno del servidor"
 ) => {
-  console.error("Error en el controlador:", error);
   res.status(statusCode).json({
     ok: false,
     status: "error",
@@ -58,6 +57,7 @@ const loginController = {
 
     try {
       const result = await loginModel.loginEmpresa(email, password);
+      console.log(result);
       if (result.error) {
         return handleError(res, null, 401, result.message);
       }

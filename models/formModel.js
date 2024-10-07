@@ -66,7 +66,6 @@ const formModel = {
       companyPostalCode,
       companyProvince,
       companyCuit,
-      agencyNumber,
       objective,
     } = data;
 
@@ -95,10 +94,9 @@ const formModel = {
       cod_postal_empresa, 
       provincia_empresa, 
       cuit_empresa, 
-      numero_agencia_empresa, 
       objetivo,
       created
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`;
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`;
 
     const values = [
       name,
@@ -125,7 +123,6 @@ const formModel = {
       companyPostalCode,
       companyProvince,
       companyCuit,
-      agencyNumber,
       objective,
     ];
 

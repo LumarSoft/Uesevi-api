@@ -10,7 +10,7 @@ const handleError = (
   console.error("Error en el controlador:", error);
   res.status(statusCode).json({
     ok: false,
-    status: "error",  // Cambiado para ser consistente con el estándar
+    status: "error", // Cambiado para ser consistente con el estándar
     statusCode,
     message: defaultMessage,
     error: error?.message || null,
@@ -21,10 +21,10 @@ const handleError = (
 const response = (res, data, statusCode = 200, message = "Éxito") => {
   res.status(statusCode).json({
     ok: true,
-    status: "success",  // Cambiado para ser consistente con el estándar
+    status: "success", // Cambiado para ser consistente con el estándar
     statusCode,
     message,
-    data,  // Se devuelve directamente el data sin anidarlo
+    data, // Se devuelve directamente el data sin anidarlo
   });
 };
 
@@ -48,14 +48,15 @@ const rateController = {
     try {
       const { percentage } = req.body;
       const { id } = req.params;
+      console.log("percentage", percentage);
 
-      // Validación de entrada
-      if (!percentage || typeof percentage !== 'number') {
+      // Validación de entrada. Percetage llega en forma de string pero en la base de datos es tipo decimal
+      if (!percentage) {
         return handleError(res, null, 400, "Porcentaje inválido");
       }
 
       const updatedRate = await rateModel.update(id, percentage);
-      
+
       // Verificación si la tasa fue actualizada
       if (!updatedRate) {
         return handleError(res, null, 404, "Tasa no encontrada");
