@@ -113,7 +113,7 @@ const formModel = {
       address,
       postalCode,
       civilStatus,
-      childrenCount,
+      Number(childrenCount),
       company,
       category,
       entryDate,

@@ -22,6 +22,12 @@ const companiesModel = {
     return formattedResults;
   },
 
+  getInPending: async () => {
+    const query = `SELECT COUNT(*) as cantidad FROM empresas WHERE estado = 'Pendiente'`;
+    const [results] = await pool.query(query);
+    return results[0];
+  },
+
   changeState: async (id, state) => {
     try {
       const query = `UPDATE empresas SET estado = ? WHERE id = ?`;

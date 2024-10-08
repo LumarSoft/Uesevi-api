@@ -39,6 +39,20 @@ const companiesController = {
     }
   },
 
+  getInPending: async (req, res, next) => {
+    try {
+      const empresas = await companiesModel.getInPending();
+      response(
+        res,
+        empresas,
+        200,
+        "Lista de empresas pendientes obtenida con éxito"
+      );
+    } catch (error) {
+      handleError(res, error);
+    }
+  },
+
   changeState: async (req, res, next) => {
     try {
       const { id } = req.params;
