@@ -22,73 +22,56 @@ const declaracionesViejasModel = {
   },
 
   getInfo: async (idEmpresa, idDeclaracion) => {
-    const query = `SELECT 
-    d.id,
-    e.nombre AS nombre_empresa,
-    COUNT(DISTINCT emp.id) AS cantidad_empleados_declaracion,
-    COUNT(DISTINCT CASE WHEN emp.sindicato_activo = 1 THEN emp.id END) AS cantidad_afiliados_declaracion,
-    d.year,
-    d.mes,
-    d.rectificada
-FROM 
-    old_contratos c
-INNER JOIN 
-    old_empleados emp ON c.old_empleado_id = emp.id
-INNER JOIN 
-    old_usuarios u ON emp.old_usuario_id = u.id
-INNER JOIN 
-    old_empresas e ON c.old_empresa_id = e.id
-INNER JOIN 
-    old_declaraciones_juradas d ON d.id = 638
-WHERE 
-    c.old_empresa_id = 81
-    AND c.deleted IS NULL`;
-    const [result] = await pool.query(query, [idDeclaracion, idEmpresa]);
+    const query = `SELECT mes, year FROM old_declaraciones_juradas WHERE  old_empresa_id = ? AND id = ? `;
+    const [result] = await pool.query(query, [idEmpresa, idDeclaracion]);
+    console.log(result);
 
-    const query2 = `SELECT 
-    CONCAT(u.nombre, ' ', u.apellido) AS nombre_completo, 
-    CASE WHEN emp.sindicato_activo = 1 THEN 'Sí' ELSE 'No' END AS afiliado,
-    emp.cuil,
-    s.sueldo_basico,
-    c2.nombre AS categoria,
-    s.adicional,
-    (s.sueldo_basico + s.adicional) AS total_bruto
-FROM 
-    old_sueldos s
-INNER JOIN 
-    (SELECT 
-        old_contrato_id, 
-        MAX(created) AS max_created
-    FROM 
-        old_sueldos 
-    GROUP BY 
-        old_contrato_id) AS max_sueldos 
-    ON s.old_contrato_id = max_sueldos.old_contrato_id 
-    AND s.created = max_sueldos.max_created
-INNER JOIN 
-    old_contratos c ON s.old_contrato_id = c.id
-INNER JOIN 
-    old_empleados emp ON c.old_empleado_id = emp.id
-INNER JOIN 
-    old_usuarios u ON emp.old_usuario_id = u.id
-INNER JOIN 
-    old_categorias c2 ON s.old_categoria_id = c2.id
-WHERE 
-    c.old_empresa_id = ?
-    AND c.deleted IS NULL
-    AND u.id IN (
-        SELECT DISTINCT u.id
-        FROM usuarios u
-        INNER JOIN old_empleados emp ON u.id = emp.old_usuario_id
-        INNER JOIN old_contratos c ON emp.id = c.old_empleado_id
-        WHERE c.old_empresa_id = ?
+        const query2 = `SELECT
+        CONCAT(u.nombre, ' ', u.apellido) AS nombre_completo,
+        CASE WHEN emp.sindicato_activo = 1 THEN 'Sí' ELSE 'No' END AS afiliado,
+        emp.cuil,
+        s.monto,
+        c2.nombre AS categoria,
+        c2.sueldo_basico AS sueldo_basico_categoria,
+        s.adicional,
+        (s.monto + s.adicional) AS total_bruto
+    FROM
+        old_sueldos s
+    INNER JOIN
+        (SELECT
+            old_contrato_id,
+            MAX(created) AS max_created
+        FROM
+            old_sueldos
+        GROUP BY
+            old_contrato_id) AS max_sueldos
+        ON s.old_contrato_id = max_sueldos.old_contrato_id
+        AND s.created = max_sueldos.max_created
+    INNER JOIN
+        old_contratos c ON s.old_contrato_id = c.id
+    INNER JOIN
+        old_empleados emp ON c.old_empleado_id = emp.id
+    INNER JOIN
+        old_usuarios u ON emp.old_usuario_id = u.id
+    INNER JOIN
+        old_categorias c2 ON s.old_categoria_id = c2.id
+    WHERE
+        c.old_empresa_id = ?
         AND c.deleted IS NULL
-    );
-`;
+        AND u.id IN (
+            SELECT DISTINCT u.id
+            FROM old_usuarios u
+            INNER JOIN old_empleados emp ON u.id = emp.old_usuario_id
+            INNER JOIN old_contratos c ON emp.id = c.old_empleado_id
+            WHERE c.old_empresa_id = ?
+            AND c.deleted IS NULL
+        );
+    `;
 
-    const [result2] = await pool.query(query2, [idEmpresa, idEmpresa]);
 
-    return { ...result[0], empleados: result2 };
+        const [result2] = await pool.query(query2, [idEmpresa, idEmpresa]);
+
+        return { ...result[0], empleados: result2 };
   },
 };
 

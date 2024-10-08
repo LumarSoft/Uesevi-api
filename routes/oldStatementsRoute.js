@@ -7,6 +7,6 @@ router.get("/", oldStatementsController.getAll); // GET /old-statements
 
 router.get("/:id", oldStatementsController.getOne); // GET /old-statements/:id
 
-router.get("/info/:idEmpresa/:idDeclaracion", oldStatementsController.getInfo); // GET /old-statements/info/:idEmpresa/:idDeclaracion
+router.get("/info/:idCompany/:idStatement", oldStatementsController.getInfo); // GET /old-statements/info/:idEmpresa/:idDeclaracion
 
 export default router;
