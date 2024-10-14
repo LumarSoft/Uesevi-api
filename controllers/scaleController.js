@@ -20,7 +20,12 @@ const handleError = (
 };
 
 // Función de respuesta estándar
-const response = (res, data, statusCode = 200, message = "Datos obtenidos con éxito") => {
+const response = (
+  res,
+  data,
+  statusCode = 200,
+  message = "Datos obtenidos con éxito"
+) => {
   res.status(statusCode).json({
     ok: true,
     status: "success",
@@ -75,7 +80,12 @@ const scaleController = {
 
       const result = await scaleModel.update(id, name);
       if (result.affectedRows > 0) {
-        response(res, { updatedEscala: req.body }, 200, "Archivo actualizado con éxito");
+        response(
+          res,
+          { updatedEscala: req.body },
+          200,
+          "Archivo actualizado con éxito"
+        );
       } else {
         response(res, null, 404, "Archivo no encontrado");
       }
@@ -87,7 +97,7 @@ const scaleController = {
   create: async (req, res, next) => {
     try {
       const { name, id } = req.body;
-      const pdf = req.files["pdf"] ? req.files["pdf"][0].path : null;
+      const pdf = req.files["pdf"] ? req.files["pdf"][0].originalname : null;
 
       // Validación de entrada
       if (!name || !pdf) {
