@@ -46,7 +46,6 @@ const setupMiddleware = () => {
   });
 };
 
-
 // Configuración de rutas
 const setupRoutes = () => {
   app.use("/login", loginRouter);
@@ -65,6 +64,9 @@ const setupRoutes = () => {
   app.use("/old-contracts", oldContractsRouter);
   app.use("/old-companies", oldCompaniesRouter);
   app.use("/inquiries", inquiriesRouter);
+  app.get("/health", (req, res) => {
+    res.status(200).send("OK");
+  });
 };
 
 // Función para encontrar un puerto disponible
@@ -93,6 +95,16 @@ const findAvailablePort = (port) => {
     }
   });
 };
+
+process.on("uncaughtException", (error) => {
+  console.error("Uncaught Exception:", error);
+  // Aquí puedes agregar lógica para registrar el error en un archivo de log
+});
+
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("Unhandled Rejection at:", promise, "reason:", reason);
+  // Aquí puedes agregar lógica para registrar el error en un archivo de log
+});
 
 // Inicialización
 setupMiddleware();
