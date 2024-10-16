@@ -26,7 +26,7 @@ import inquiriesRouter from "./routes/inquiriesRoute.js";
 import newsRouter from "./routes/newsRoute.js";
 
 const app = express();
-const startingPort = process.env.PORT || 3006; // Usar variable de entorno para el puerto
+const startingPort = process.env.PORT || 3010; // Usar variable de entorno para el puerto
 
 // Resuelve __dirname para módulos ES
 const __filename = fileURLToPath(import.meta.url);
