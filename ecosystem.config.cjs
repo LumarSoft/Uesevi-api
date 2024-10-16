@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: "luso_api",
+      name: "Uesevi_api",
       script: "./app.js",
       instances: 1,
       autorestart: true,
