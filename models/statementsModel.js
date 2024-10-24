@@ -53,7 +53,8 @@ ORDER BY
     d.mes,
     d.rectificada,
     d.vencimiento,
-    d.fecha_pago
+    d.fecha_pago,
+    d.pago_parcial
 FROM 
     contratos c
 INNER JOIN 
@@ -119,13 +120,38 @@ WHERE
 
   getStatementsByCompany: async (idCompany) => {
     const query = `
-      SELECT dj.*, e.nombre AS nombre_empresa, e.cuit AS cuit_empresa
-      FROM declaraciones_juradas dj
-      INNER JOIN empresas e ON dj.empresa_id = e.id
-      WHERE dj.empresa_id = ?
-      ORDER BY dj.modified DESC
+      SELECT 
+        dj.*,
+        e.nombre AS nombre_empresa,
+        e.cuit AS cuit_empresa
+      FROM 
+        declaraciones_juradas dj
+      INNER JOIN 
+        empresas e ON dj.empresa_id = e.id
+      INNER JOIN (
+        SELECT
+          empresa_id,
+          mes,
+          year,
+          MAX(rectificada) AS max_rectificada
+        FROM
+          declaraciones_juradas
+        WHERE 
+          empresa_id = ?
+        GROUP BY
+          empresa_id, mes, year
+      ) AS max_dj ON dj.empresa_id = max_dj.empresa_id
+        AND dj.mes = max_dj.mes
+        AND dj.year = max_dj.year
+        AND dj.rectificada = max_dj.max_rectificada
+      WHERE 
+        dj.empresa_id = ?
+      ORDER BY
+        dj.year DESC,
+        dj.mes DESC,
+        dj.modified DESC;
     `;
-    const [results] = await pool.query(query, idCompany);
+    const [results] = await pool.query(query, [idCompany, idCompany]);
     return results;
   },
 
@@ -141,26 +167,42 @@ WHERE
     return results;
   },
 
-  changeState: async (id, state) => {
+  changeState: async (id, state, partial_payment) => {
     let query;
+    let params;
 
-    // En caso que los estados sean 1 o 2 tambien cambiar la fecha_pago con la fecha actual
-
-    if (state === "1" || state === "2") {
+    // En caso que el estado sea 1, actualizar fecha_pago con la fecha actual y poner pago_parcial en NULL
+    if (state === "1") {
       query = `
         UPDATE declaraciones_juradas
-        SET estado = ?, fecha_pago = CURRENT_TIMESTAMP
+        SET estado = ?, fecha_pago = CURRENT_TIMESTAMP, pago_parcial = NULL
         WHERE id = ?
       `;
+      params = [state, id];
+    } else if (state === "2") {
+      query = `
+        UPDATE declaraciones_juradas
+        SET estado = ?, fecha_pago = CURRENT_TIMESTAMP, pago_parcial = ?
+        WHERE id = ?
+      `;
+      params = [state, partial_payment, id];
+    } else if (state === "0" || state === "3") {
+      query = `
+        UPDATE declaraciones_juradas
+        SET estado = ?, fecha_pago = NULL, pago_parcial = NULL
+        WHERE id = ?
+      `;
+      params = [state, id];
     } else {
       query = `
         UPDATE declaraciones_juradas
         SET estado = ?
         WHERE id = ?
       `;
+      params = [state, id];
     }
 
-    const result = await pool.query(query, [state, id]);
+    const [result] = await pool.query(query, params);
     return result;
   },
 

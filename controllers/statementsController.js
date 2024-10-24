@@ -107,13 +107,22 @@ const statementsController = {
     try {
       const { id } = req.params;
       const { state } = req.body;
+      const { partial_payment } = req.body;
+      console.log(req.body);
 
       // Validación de entrada
       if (!state) {
         return handleError(res, null, 400, "El campo 'state' es obligatorio");
       }
 
-      const result = await statementsModel.changeState(id, state);
+      const result = await statementsModel.changeState(
+        id,
+        state,
+        partial_payment
+      );
+
+      console.log(result);
+
       if (result.affectedRows > 0) {
         response(
           res,
