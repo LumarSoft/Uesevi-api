@@ -24,6 +24,7 @@ import oldContractsRouter from "./routes/oldContratsRoute.js";
 import oldCompaniesRouter from "./routes/oldCompaniesRoute.js";
 import inquiriesRouter from "./routes/inquiriesRoute.js";
 import newsRouter from "./routes/newsRoute.js";
+import basicSalaryRouter from "./routes/basicSalaryRoute.js";
 
 const app = express();
 const startingPort = process.env.PORT || 3010; // Usar variable de entorno para el puerto
@@ -64,6 +65,7 @@ const setupRoutes = () => {
   app.use("/old-contracts", oldContractsRouter);
   app.use("/old-companies", oldCompaniesRouter);
   app.use("/inquiries", inquiriesRouter);
+  app.use("/basicSalary", basicSalaryRouter);
   app.get("/health", (req, res) => {
     res.status(200).send("OK");
   });
