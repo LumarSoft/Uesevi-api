@@ -1,6 +1,6 @@
 import cron from "node-cron";
 import { pool } from "./db/db.js"; // Tu conexión a la base de datos
-import { transporter } from "./mailer.js";
+// import { transporter } from "./mailer.js";
 
 // Función existente que ya tienes para actualizar sueldos
 const checkAndUpdateSalaries = async () => {
