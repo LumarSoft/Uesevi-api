@@ -334,7 +334,7 @@ WHERE
           lastDeclarationMonth = 12;
           lastDeclarationYear = currentYear - 1;
         } else {
-          lastDeclarationMonth = currentMonth;
+          lastDeclarationMonth = currentMonth - 1;
           lastDeclarationYear = currentYear;
         }
       } else {
@@ -342,12 +342,12 @@ WHERE
         lastDeclarationYear = resultsLastDeclaration[0].year;
       }
 
-      const lastDayOfDeclarationMonth = new Date(
+      // Calculamos el último día del mes de la declaración
+      const lastDayOfMonth = new Date(
         lastDeclarationYear,
         lastDeclarationMonth + 1,
         0
       ).getDate();
-      
       const dueDate = new Date(
         lastDeclarationYear,
         lastDeclarationMonth,
