@@ -344,15 +344,15 @@ WHERE
 
       const lastDayOfDeclarationMonth = new Date(
         lastDeclarationYear,
-        lastDeclarationMonth + 1, // Aumentamos en 1 para obtener el último día del mes actual
+        lastDeclarationMonth + 1,
         0
       ).getDate();
       
       const dueDate = new Date(
         lastDeclarationYear,
-        lastDeclarationMonth, // No restes aquí, el mes ya está bien
-        lastDayOfDeclarationMonth
-      );      
+        lastDeclarationMonth,
+        lastDayOfMonth
+      );
 
       // Insertamos una nueva declaracion jurada
       const queryInsertDeclaration = `INSERT INTO declaraciones_juradas (id, fecha, empresa_id, mes, year, vencimiento, importe, sueldo_basico, created, modified) VALUES (?, NOW(), ?, ?, ?, ?, ?, ?, NOW(), NOW());`;
