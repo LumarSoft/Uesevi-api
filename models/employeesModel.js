@@ -345,12 +345,12 @@ WHERE
       // Calculamos el último día del mes de la declaración
       const lastDayOfMonth = new Date(
         lastDeclarationYear,
-        lastDeclarationMonth,
+        lastDeclarationMonth + 1,
         0
       ).getDate();
       const dueDate = new Date(
         lastDeclarationYear,
-        lastDeclarationMonth - 1,
+        lastDeclarationMonth,
         lastDayOfMonth
       );
 
