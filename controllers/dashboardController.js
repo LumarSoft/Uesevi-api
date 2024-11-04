@@ -49,58 +49,6 @@ const dashboardController = {
     }
   },
 
-  // Métodos adicionales que podrías considerar agregar
-  getById: async (req, res, next) => {
-    try {
-      const { id } = req.params;
-      const data = await dashboardModel.getById(id); // Asegúrate de que el modelo tenga el método getById
-      if (!data) {
-        return handleError(res, null, 404, "Dashboard no encontrado");
-      }
-      response(res, data, 200, "Datos del dashboard obtenidos con éxito");
-    } catch (error) {
-      handleError(res, error);
-    }
-  },
-
-  create: async (req, res, next) => {
-    try {
-      const { field1, field2 } = req.body; // Cambia esto por los campos reales
-      const result = await dashboardModel.create(field1, field2); // Asegúrate de que el modelo tenga el método create
-      response(res, result, 201, "Dashboard creado con éxito");
-    } catch (error) {
-      handleError(res, error);
-    }
-  },
-
-  update: async (req, res, next) => {
-    try {
-      const { id } = req.params;
-      const { field1, field2 } = req.body; // Cambia esto por los campos reales
-      const result = await dashboardModel.update(id, field1, field2); // Asegúrate de que el modelo tenga el método update
-      if (result.affectedRows > 0) {
-        response(res, null, 200, "Dashboard actualizado con éxito");
-      } else {
-        handleError(res, null, 404, "Dashboard no encontrado");
-      }
-    } catch (error) {
-      handleError(res, error);
-    }
-  },
-
-  delete: async (req, res, next) => {
-    try {
-      const { id } = req.params;
-      const result = await dashboardModel.delete(id); // Asegúrate de que el modelo tenga el método delete
-      if (result.affectedRows > 0) {
-        response(res, null, 200, "Dashboard eliminado con éxito");
-      } else {
-        handleError(res, null, 404, "Dashboard no encontrado");
-      }
-    } catch (error) {
-      handleError(res, error);
-    }
-  },
 };
 
 export default dashboardController;
