@@ -47,6 +47,7 @@ WHERE
       u.email,
       u.telefono,
       u.estado,
+      e.id AS empleado_id,
       e.cuil, 
       e.domicilio,
       e.categoria_id,
@@ -70,6 +71,7 @@ WHERE
     `;
 
     const [results] = await pool.query(query, [id]);
+    console.log(results);
 
     // Formatea las fechas
     const formattedResults = results.map((result) => ({
@@ -150,13 +152,6 @@ WHERE
       const queryLastIdContract = `SELECT MAX(id) as lastId FROM contratos LIMIT 1`;
       const [resultsLastIdContract] = await pool.query(queryLastIdContract);
       const lastIdContract = resultsLastIdContract[0].lastId;
-
-      console.log(
-        lastIdContract + 1,
-        lastIdEmployee + 1,
-        Number(companyId),
-        employmentStatus.toString()
-      );
 
       const queryContract = `INSERT INTO contratos (id, empleado_id, empresa_id, estado, created) VALUES (?, ?, ?, ?, NOW());`;
       const [resultsContract] = await pool.query(queryContract, [
@@ -353,9 +348,13 @@ WHERE
         lastDeclarationMonth,
         lastDayOfMonth
       );
+      const sueldobasico = `SELECT sueldo_basico FROM categorias WHERE id = 1`;
+      const [resultsSueldoBasico] = await connection.query(sueldobasico);
+      const sueldoBasicoCategoriaGeneral = resultsSueldoBasico[0].sueldo_basico;
 
       // Insertamos una nueva declaracion jurada
-      const queryInsertDeclaration = `INSERT INTO declaraciones_juradas (id, fecha, empresa_id, mes, year, vencimiento, importe, sueldo_basico, created, modified) VALUES (?, NOW(), ?, ?, ?, ?, ?, ?, NOW(), NOW());`;
+      const queryInsertDeclaration = `INSERT INTO declaraciones_juradas (id, fecha, empresa_id, mes, year, vencimiento, importe, sueldo_basico, created, modified)
+      VALUES (?, NOW(), ?, ?, ?, ?, ?, ?, NOW(), NOW());`;
       await connection.query(queryInsertDeclaration, [
         lastIdDeclaration + 1,
         companyId,
@@ -366,7 +365,7 @@ WHERE
         // ultimo dia del mes de la declaracion
         dueDate,
         0,
-        0,
+        sueldoBasicoCategoriaGeneral,
       ]);
 
       // Ahora registramos datos en la tabla sueldos
@@ -400,26 +399,45 @@ WHERE
           employee.adherido_a_sindicato === "Si" ? 1 : 0,
         ]);
 
-        let total = 0;
-        let aportes = 0;
-        total = Number(employee.sueldo_bsico) + Number(employee.adicionales);
+        // Convertimos los valores a números y nos aseguramos que sean válidos
+        const sueldoBasico = Number(employee.sueldo_bsico) || 0;
+        const adicionales = Number(employee.adicionales) || 0;
 
+        // Calculamos el FAS (1% del sueldo básico de la categoría 1)
+        const fas = sueldoBasicoCategoriaGeneral * 0.01;
+
+        // Variable para almacenar el aporte (sindicato o solidario)
+        let aportes = 0;
+
+        // Calculamos el aporte según corresponda
         if (employee.adherido_a_sindicato === "Si") {
-          aportes = total * 0.04;
+          // Si es adherente: 3% del (sueldo básico + adicionales)
+          aportes = (sueldoBasico + adicionales) * 0.03;
         } else {
-          aportes = total * 0.03;
+          // Si no es adherente: 2% del sueldo básico
+          aportes = sueldoBasico * 0.02;
         }
 
-        amount = amount + aportes;
+        // Sumamos al monto total tanto el FAS como los aportes
+        amount += fas + aportes;
       }
 
+      const finalAmount = Number(amount.toFixed(2));
+
       // Actualizamos el importe de la declaracion jurada
-      const queryUpdateDeclaration = `UPDATE declaraciones_juradas SET subtotal = ?, interes = 0, importe = ? WHERE id = ?;`;
-      await connection.query(queryUpdateDeclaration, [
-        amount,
-        amount,
-        lastIdDeclaration + 1,
-      ]);
+      const queryUpdateDeclaration = `
+      UPDATE declaraciones_juradas 
+      SET subtotal = ?, 
+          interes = 0, 
+          importe = ? 
+      WHERE id = ?;
+    `;
+    
+    await connection.query(queryUpdateDeclaration, [
+      finalAmount,
+      finalAmount,
+      lastIdDeclaration + 1,
+    ]);
 
       // Commit de la transacción
       await connection.commit();

@@ -54,7 +54,9 @@ ORDER BY
     d.rectificada,
     d.vencimiento,
     d.fecha_pago,
-    d.pago_parcial
+    d.pago_parcial,
+    d.subtotal,
+    d.sueldo_basico  
 FROM 
     contratos c
 INNER JOIN 
@@ -110,7 +112,11 @@ WHERE
         INNER JOIN contratos c ON emp.id = c.empleado_id
         WHERE c.empresa_id = ?
         AND c.deleted IS NULL
-    );
+    )
+ORDER BY 
+    emp.sindicato_activo DESC,  
+    nombre_completo;             
+;
 `;
 
     const [result2] = await pool.query(query2, [idEmpresa, idEmpresa]);
