@@ -61,6 +61,17 @@ const categoryModel = {
 
     return result;
   },
+
+  updateNow: async () => {
+    console.log("llego hasta aca")
+    const now = new Date();
+    const query =
+      "UPDATE categorias SET sueldo_basico = sueldo_futuro, sueldo_futuro = NULL, fecha_vigencia = NULL WHERE fecha_vigencia <= ? AND sueldo_futuro IS NOT NULL";
+
+    const [result] = await pool.query(query, [now]);
+
+    return result;
+  },
 };
 
 export default categoryModel;

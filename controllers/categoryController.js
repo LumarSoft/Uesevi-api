@@ -99,6 +99,15 @@ const categoryController = {
       handleError(res, error);
     }
   },
+
+  updateNow: async (req, res, next) => {
+    try {
+      const result = await categoryModel.updateNow();
+      response(res, result, 200, "Salarios actualizados con éxito");
+    } catch (error) {
+      handleError(res, error);
+    }
+  },
 };
 
 export default categoryController;

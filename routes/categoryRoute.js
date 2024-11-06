@@ -18,4 +18,6 @@ router.put(
   categoryController.futureSalary
 ); // PUT /categories/:id/future-salary
 
+router.get("/update-now", upload.none(), categoryController.updateNow); // PUT /categories/update-now
+
 export default router;
