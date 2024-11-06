@@ -3,7 +3,7 @@ import { pool } from "../db/db.js";
 const statementsModel = {
   getAll: async () => {
     const query = `
-     SELECT
+    SELECT
   dj.*,
   e.nombre AS nombre_empresa,
   e.cuit AS cuit_empresa
@@ -26,7 +26,7 @@ INNER JOIN (
   AND dj.year = max_dj.year
   AND dj.rectificada = max_dj.max_rectificada
 ORDER BY
-  dj.modified DESC;
+  dj.id DESC;
     `;
     const [results] = await pool.query(query);
     return results;
@@ -77,6 +77,7 @@ WHERE
     CASE WHEN emp.sindicato_activo = 1 THEN 'Sí' ELSE 'No' END AS afiliado,
     emp.cuil,
     s.sueldo_basico,
+    s.monto,
     s.remunerativo_adicional,
     s.adicional_norem AS suma_no_remunerativa,
     c2.nombre AS categoria,
@@ -85,15 +86,7 @@ WHERE
 FROM 
     sueldos s
 INNER JOIN 
-    (SELECT 
-        contrato_id, 
-        MAX(created) AS max_created 
-    FROM 
-        sueldos 
-    GROUP BY 
-        contrato_id) AS max_sueldos 
-    ON s.contrato_id = max_sueldos.contrato_id 
-    AND s.created = max_sueldos.max_created
+    declaraciones_juradas d ON s.declaraciones_jurada_id = d.id
 INNER JOIN 
     contratos c ON s.contrato_id = c.id
 INNER JOIN 
@@ -103,23 +96,14 @@ INNER JOIN
 INNER JOIN 
     categorias c2 ON s.categoria_id = c2.id
 WHERE 
-    c.empresa_id = ?
-    AND c.deleted IS NULL
-    AND u.id IN (
-        SELECT DISTINCT u.id
-        FROM usuarios u
-        INNER JOIN empleados emp ON u.id = emp.usuario_id
-        INNER JOIN contratos c ON emp.id = c.empleado_id
-        WHERE c.empresa_id = ?
-        AND c.deleted IS NULL
-    )
+    d.id = ?
+    AND c.empresa_id = ?
 ORDER BY 
     emp.sindicato_activo DESC,  
-    nombre_completo;             
-;
+    nombre_completo;
 `;
 
-    const [result2] = await pool.query(query2, [idEmpresa, idEmpresa]);
+    const [result2] = await pool.query(query2, [idDeclaracion, idEmpresa]);
 
     return { ...result[0], empleados: result2 };
   },

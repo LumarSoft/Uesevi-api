@@ -221,7 +221,7 @@ WHERE
         const query = `SELECT id, usuario_id, cuil, categoria_id, sindicato_activo FROM empleados WHERE cuil = ? ORDER BY id DESC LIMIT 1`;
         const [results] = await connection.query(query, [employee.cuil]);
 
-        // Buscamos el id de la categoria, lo vamos a usar encuentre o no encuentre el empleado
+        // Buscamos el id y el sueldo basico de la categoria, lo vamos a usar encuentre o no encuentre el empleado
         const queryCategoryId = `SELECT id FROM categorias WHERE nombre = ?`;
         const [resultsCategoryId] = await connection.query(queryCategoryId, [
           employee.categora,
@@ -371,7 +371,7 @@ WHERE
       // Ahora registramos datos en la tabla sueldos
       for (const employee of employees) {
         // Primero buscar el id del contrato de cada empleado
-        const queryContractId = `SELECT id FROM contratos WHERE empleado_id = (SELECT id FROM empleados WHERE cuil = ? ORDER BY id DESC LIMIT 1)` // Correccion aca?;
+        const queryContractId = `SELECT id FROM contratos WHERE empleado_id = (SELECT id FROM empleados WHERE cuil = ? ORDER BY id DESC LIMIT 1)`; // Correccion aca?;
         const [resultsContractId] = await connection.query(queryContractId, [
           employee.cuil,
         ]);
@@ -382,21 +382,23 @@ WHERE
         const [resultsLastIdSalary] = await connection.query(queryLastIdSalary);
         const lastIdSalary = resultsLastIdSalary[0].lastId;
 
-        const queryCategoryId = `SELECT id FROM categorias WHERE nombre = ?`;
+        const queryCategoryId = `SELECT id,sueldo_basico FROM categorias WHERE nombre = ?`;
         const [resultsCategoryId] = await connection.query(queryCategoryId, [
           employee.categora,
         ]);
         const categoryId = resultsCategoryId[0].id;
+        const categorySueldoBasico = resultsCategoryId[0].sueldo_basico;
 
-        const queryInsertSalary = `INSERT INTO sueldos (id, contrato_id, declaraciones_jurada_id,adicional, sueldo_basico, categoria_id, sindicato_activo, created, modified) VALUES (?, ?, ?, ?, ? , ?, ?, now(), now());`;
+        const queryInsertSalary = `INSERT INTO sueldos (id, contrato_id, declaraciones_jurada_id,adicional, sueldo_basico, categoria_id, sindicato_activo, monto, created, modified) VALUES (?, ?, ?, ?, ? , ?, ?, ?, now(), now());`;
         await connection.query(queryInsertSalary, [
           lastIdSalary + 1,
           contractId,
           lastIdDeclaration + 1,
           Number(employee.adicionales),
-          employee.sueldo_bsico,
+          categorySueldoBasico,
           categoryId,
           employee.adherido_a_sindicato === "Si" ? 1 : 0,
+          employee.sueldo_bsico,
         ]);
 
         // Convertimos los valores a números y nos aseguramos que sean válidos
@@ -432,12 +434,12 @@ WHERE
           importe = ? 
       WHERE id = ?;
     `;
-    
-    await connection.query(queryUpdateDeclaration, [
-      finalAmount,
-      finalAmount,
-      lastIdDeclaration + 1,
-    ]);
+
+      await connection.query(queryUpdateDeclaration, [
+        finalAmount,
+        finalAmount,
+        lastIdDeclaration + 1,
+      ]);
 
       // Commit de la transacción
       await connection.commit();
