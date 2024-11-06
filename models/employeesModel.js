@@ -206,11 +206,11 @@ WHERE
     await connection.beginTransaction();
 
     try {
-      // Hacemos una query para poner el campo deleted a todos los empleados que esten en la empresa en este momento
+      // Hacemos una query para poner el campo deleted a todos los empleados que estén en la empresa en este momento
       const queryDeleteEmployees = `UPDATE contratos SET deleted = NOW() WHERE empresa_id = ?;`;
       await connection.query(queryDeleteEmployees, [companyId]);
 
-      // Tambien lo hacemos en la tabla usuarios
+      // También lo hacemos en la tabla usuarios
       const queryDeleteUsers = `UPDATE usuarios SET deleted = NOW() WHERE id IN (SELECT usuario_id FROM empleados WHERE id IN (SELECT empleado_id FROM contratos WHERE empresa_id = ?));`;
       await connection.query(queryDeleteUsers, [companyId]);
 
@@ -218,7 +218,7 @@ WHERE
       // Recorremos cada empleado dentro del array de employees
       for (const employee of employees) {
         //Primero validamos si el empleado no exiten en la base de datos
-        const query = `SELECT id, usuario_id, cuil, categoria_id, sindicato_activo FROM empleados WHERE cuil = ?`;
+        const query = `SELECT id, usuario_id, cuil, categoria_id, sindicato_activo FROM empleados WHERE cuil = ? ORDER BY id DESC LIMIT 1`;
         const [results] = await connection.query(query, [employee.cuil]);
 
         // Buscamos el id de la categoria, lo vamos a usar encuentre o no encuentre el empleado
@@ -371,7 +371,7 @@ WHERE
       // Ahora registramos datos en la tabla sueldos
       for (const employee of employees) {
         // Primero buscar el id del contrato de cada empleado
-        const queryContractId = `SELECT id FROM contratos WHERE empleado_id = (SELECT id FROM empleados WHERE cuil = ?) ORDER BY created DESC LIMIT 1`;
+        const queryContractId = `SELECT id FROM contratos WHERE empleado_id = (SELECT id FROM empleados WHERE cuil = ? ORDER BY id DESC LIMIT 1)` // Correccion aca?;
         const [resultsContractId] = await connection.query(queryContractId, [
           employee.cuil,
         ]);
