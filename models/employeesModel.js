@@ -305,7 +305,7 @@ WHERE
           }
 
         } catch (error) {
-          console.error(`Error processing employee at index ${index}:`, error);
+          console.error(`Error en el primer for con el empleado: ${employee} que tiene el index ${index}:`, error);
           throw error;
 
         }
@@ -434,7 +434,7 @@ WHERE
           // Sumamos al monto total tanto el FAS como los aportes
           amount += fas + aportes;
         } catch (error) {
-          console.error(`Error processing employee at index ${index}:`, error);
+          console.error(`Error en el segundo for con el empleado: ${employee} que tiene el index ${index}:`, error);
           throw error;
 
         }
