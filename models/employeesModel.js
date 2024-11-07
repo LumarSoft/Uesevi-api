@@ -452,7 +452,7 @@ WHERE
     } catch (error) {
       // Si ocurre un error, deshacemos la transacción
       await connection.rollback();
-      console.error("Error en la transacción:", error);
+      console.error("Error en la transacción:", error, ". El error ocurrio en la empresa con id: ", companyId);
     } finally {
       // Cerramos la conexión
       connection.release();
