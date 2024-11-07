@@ -374,7 +374,7 @@ WHERE
       for (const employee of employees) {
         // Primero buscar el id del contrato de cada empleado
         console.log(employee.cuil);
-        const queryContractId = `SELECT id FROM contratos WHERE empleado_id = (SELECT id FROM empleados WHERE cuil = ? ORDER BY id DESC LIMIT 1)`; // Correccion aca?;
+        const queryContractId = `SELECT id FROM contratos WHERE empleado_id = ( SELECT id FROM empleados WHERE cuil = ? ORDER BY id DESC LIMIT 1 ) ORDER BY id DESC LIMIT 1;`; // Correccion aca?;
         const [resultsContractId] = await connection.query(queryContractId, [
           employee.cuil,
         ]);
