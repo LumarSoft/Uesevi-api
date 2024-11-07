@@ -108,7 +108,6 @@ const statementsController = {
       const { id } = req.params;
       const { state } = req.body;
       const { partial_payment } = req.body;
-      console.log(req.body);
 
       // Validación de entrada
       if (!state) {
@@ -176,6 +175,23 @@ const statementsController = {
         month
       );
       response(res, result, 201, "Declaración rectificada con éxito");
+    } catch (error) {
+      handleError(res, error);
+    }
+  },
+
+  changeExpiration: async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      const { expiration } = req.body;
+
+      const result = await statementsModel.changeExpiration(id, expiration);
+      response(
+        res,
+        result,
+        200,
+        "Fecha de vencimiento de la declaración actualizada con éxito"
+      );
     } catch (error) {
       handleError(res, error);
     }

@@ -368,14 +368,19 @@ WHERE
         sueldoBasicoCategoriaGeneral,
       ]);
 
+
+
       // Ahora registramos datos en la tabla sueldos
       for (const employee of employees) {
         // Primero buscar el id del contrato de cada empleado
+        console.log(employee.cuil);
         const queryContractId = `SELECT id FROM contratos WHERE empleado_id = (SELECT id FROM empleados WHERE cuil = ? ORDER BY id DESC LIMIT 1)`; // Correccion aca?;
         const [resultsContractId] = await connection.query(queryContractId, [
           employee.cuil,
         ]);
         const contractId = resultsContractId[0].id;
+
+
 
         // Ahora que tenemos el id del contrato de la persona insertamos en sueldos
         const queryLastIdSalary = `SELECT MAX(id) as lastId FROM sueldos`;

@@ -165,21 +165,21 @@ ORDER BY
     if (state === "1") {
       query = `
         UPDATE declaraciones_juradas
-        SET estado = ?, fecha_pago = CURRENT_TIMESTAMP, pago_parcial = NULL
+        SET estado = ?, pago_parcial = NULL
         WHERE id = ?
       `;
       params = [state, id];
     } else if (state === "2") {
       query = `
         UPDATE declaraciones_juradas
-        SET estado = ?, fecha_pago = CURRENT_TIMESTAMP, pago_parcial = ?
+        SET estado = ?, pago_parcial = ?
         WHERE id = ?
       `;
       params = [state, partial_payment, id];
     } else if (state === "0" || state === "3") {
       query = `
         UPDATE declaraciones_juradas
-        SET estado = ?, fecha_pago = NULL, pago_parcial = NULL
+        SET estado = ?, pago_parcial = NULL
         WHERE id = ?
       `;
       params = [state, id];
@@ -203,19 +203,18 @@ ORDER BY
     const porcentaje = parseFloat(resultTasa[0].porcentaje);
 
     // Consulta para obtener los datos de la declaración jurada
-    const queryDatoDeclaracion = `SELECT vencimiento, subtotal, mes FROM declaraciones_juradas WHERE id = ?`;
+    const queryDatoDeclaracion = `SELECT subtotal, mes FROM declaraciones_juradas WHERE id = ?`;
     const [resultDatoDeclaracion] = await pool.query(queryDatoDeclaracion, id);
     const subtotal = parseFloat(resultDatoDeclaracion[0].subtotal);
     const mes = resultDatoDeclaracion[0].mes;
 
     // Calculamos el último día del mes de la declaración jurada (fecha de vencimiento original)
-    const vencimientoOriginal = new Date(new Date().getFullYear(), mes, 0); // último día del mes
+    const vencimientoOriginal = new Date(new Date().getFullYear(), mes + 1, 0); // último día del mes
+    console.log(vencimientoOriginal);
 
     // Pasamos la fecha que envía el usuario a un objeto Date
     const datePayment = new Date(date);
-
-    // Obtenemos la fecha actual para comparar
-    const today = new Date();
+    datePayment.setDate(datePayment.getDate() + 1);
 
     let diffDays = 0;
     let interesesRedondeado = 0;
@@ -225,7 +224,7 @@ ORDER BY
     if (datePayment > vencimientoOriginal) {
       // Calculamos la diferencia de días entre la fecha de vencimiento original y la fecha de pago
       const diffTime = Math.abs(datePayment - vencimientoOriginal);
-      diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) - 1;
 
       // Calculamos los intereses basados en los días de retraso
       const intereses = (subtotal * porcentaje * diffDays) / 100;
@@ -243,15 +242,16 @@ ORDER BY
     console.log("Subtotal:", subtotal);
     console.log("Importe final:", importe);
 
-    const datePaymentPlusOne = new Date(datePayment);
-    datePaymentPlusOne.setDate(datePaymentPlusOne.getDate() + 1);
+    // const datePaymentPlusOne = new Date(datePayment);
+    // datePaymentPlusOne.setDate(datePaymentPlusOne.getDate() + 1);
 
     // Actualizamos la base de datos con los nuevos valores
-    const queryUpdate = `UPDATE declaraciones_juradas SET vencimiento = ?, importe = ?, interes = ? WHERE id = ?`;
+    const queryUpdate = `UPDATE declaraciones_juradas SET vencimiento = ?, importe = ?, interes = ?, fecha_pago = ? WHERE id = ?`;
     const [result] = await pool.query(queryUpdate, [
-      datePaymentPlusOne, // Sumar un día a la fecha de pago
+      vencimientoOriginal, // Sumar un día a la fecha de pago
       importe,
       interesesRedondeado,
+      datePayment,
       id,
     ]);
 
@@ -455,6 +455,12 @@ ORDER BY
       // Cerramos la conexión
       connection.release();
     }
+  },
+
+  changeExpiration: async (id, expiration) => {
+    const query = `UPDATE declaraciones_juradas SET vencimiento = ? WHERE id = ?`;
+    const [result] = await pool.query(query, [expiration, id]);
+    return result;
   },
 };
 

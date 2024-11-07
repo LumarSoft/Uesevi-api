@@ -24,4 +24,6 @@ router.put(
 
 router.post("/rectifications", upload.none(), statementsController.rectify); // POST /statements/rectificar
 
+router.put("/:id/expiration", upload.any(), statementsController.changeExpiration); // PUT /statements/:id/expiration 
+
 export default router;
