@@ -162,7 +162,7 @@ WHERE
       ]);
 
       return [results, resultsEmployee, resultsContract];
-    } catch (error) {}
+    } catch (error) { }
   },
 
   editEmployee: async (
@@ -216,93 +216,100 @@ WHERE
 
       let amount = 0;
       // Recorremos cada empleado dentro del array de employees
-      for (const employee of employees) {
-        //Primero validamos si el empleado no exiten en la base de datos
-        const query = `SELECT id, usuario_id, cuil, categoria_id, sindicato_activo FROM empleados WHERE cuil = ? ORDER BY id DESC LIMIT 1`;
-        const [results] = await connection.query(query, [employee.cuil]);
+      for (const [index, employee] of employees.entries()) {
+        try {
+          const query = `SELECT id, usuario_id, cuil, categoria_id, sindicato_activo FROM empleados WHERE cuil = ? ORDER BY id DESC LIMIT 1`;
+          const [results] = await connection.query(query, [employee.cuil]);
 
-        // Buscamos el id y el sueldo basico de la categoria, lo vamos a usar encuentre o no encuentre el empleado
-        const queryCategoryId = `SELECT id FROM categorias WHERE nombre = ?`;
-        const [resultsCategoryId] = await connection.query(queryCategoryId, [
-          employee.categora,
-        ]);
-        const categoryId = resultsCategoryId[0].id;
-
-        //Si el empleado no existe en la base de datos, lo agregamos
-        if (results.length === 0) {
-          // Para insertar primero va a ser necesario obtener el ultimo id de la tabla usuarios
-          const queryLastId = `SELECT MAX(id) as lastId FROM usuarios`;
-          const [resultsLastId] = await connection.query(queryLastId);
-          const lastIdUser = resultsLastId[0].lastId;
-
-          // Insertamos el usuario
-          const queryInsertUser = `INSERT INTO usuarios (id, nombre, apellido, rol, estado, created, modified) VALUES (?, ?, ?, ?, ?, NOW(), NOW());`;
-
-          await connection.query(queryInsertUser, [
-            lastIdUser + 1,
-            employee.nombre,
-            employee.apellido,
-            "empleado",
-            1,
+          // Buscamos el id y el sueldo basico de la categoria, lo vamos a usar encuentre o no encuentre el empleado
+          const queryCategoryId = `SELECT id FROM categorias WHERE nombre = ?`;
+          const [resultsCategoryId] = await connection.query(queryCategoryId, [
+            employee.categora,
           ]);
+          const categoryId = resultsCategoryId[0].id;
 
-          // Buscamos el ultimo id de la tabla empleados
-          const queryLastIdEmployee = `SELECT MAX(id) as lastId FROM empleados`;
-          const [resultsLastIdEmployee] = await connection.query(
-            queryLastIdEmployee
-          );
-          const lastIdEmployee = resultsLastIdEmployee[0].lastId;
+          //Si el empleado no existe en la base de datos, lo agregamos
+          if (results.length === 0) {
+            // Para insertar primero va a ser necesario obtener el ultimo id de la tabla usuarios
+            const queryLastId = `SELECT MAX(id) as lastId FROM usuarios`;
+            const [resultsLastId] = await connection.query(queryLastId);
+            const lastIdUser = resultsLastId[0].lastId;
 
-          // Insertamos el empleado
-          const queryInsertEmployee = `INSERT INTO empleados (id, cuil, usuario_id, categoria_id, sindicato_activo) VALUES (?, ?, ?, ?, ?);`;
+            // Insertamos el usuario
+            const queryInsertUser = `INSERT INTO usuarios (id, nombre, apellido, rol, estado, created, modified) VALUES (?, ?, ?, ?, ?, NOW(), NOW());`;
 
-          await connection.query(queryInsertEmployee, [
-            lastIdEmployee + 1,
-            employee.cuil,
-            lastIdUser + 1,
-            categoryId,
-            employee.adherido_a_sindicato === "Si" ? 1 : 0,
-          ]);
+            await connection.query(queryInsertUser, [
+              lastIdUser + 1,
+              employee.nombre,
+              employee.apellido,
+              "empleado",
+              1,
+            ]);
 
-          // Buscamos el ultimo id de la tabla contratos
-          const queryLastIdContract = `SELECT MAX(id) as lastId FROM contratos`;
-          const [resultsLastIdContract] = await connection.query(
-            queryLastIdContract
-          );
-          const lastIdContract = resultsLastIdContract[0].lastId;
+            // Buscamos el ultimo id de la tabla empleados
+            const queryLastIdEmployee = `SELECT MAX(id) as lastId FROM empleados`;
+            const [resultsLastIdEmployee] = await connection.query(
+              queryLastIdEmployee
+            );
+            const lastIdEmployee = resultsLastIdEmployee[0].lastId;
 
-          // Insertamos el contrato
-          const queryInsertContract = `INSERT INTO contratos (id, empleado_id, empresa_id, estado, created, modified) VALUES (?, ?, ?, '1', NOW(), NOW());`;
+            // Insertamos el empleado
+            const queryInsertEmployee = `INSERT INTO empleados (id, cuil, usuario_id, categoria_id, sindicato_activo) VALUES (?, ?, ?, ?, ?);`;
 
-          await connection.query(queryInsertContract, [
-            lastIdContract + 1,
-            lastIdEmployee + 1,
-            companyId,
-          ]);
-        } else {
-          // Aca tenemos que validar si los datos son diferentes o iguales a los que ya tenemos
-          const result = results[0];
+            await connection.query(queryInsertEmployee, [
+              lastIdEmployee + 1,
+              employee.cuil,
+              lastIdUser + 1,
+              categoryId,
+              employee.adherido_a_sindicato === "Si" ? 1 : 0,
+            ]);
 
-          // Actualizamos el empleado
-          const queryUpdateEmployee = `UPDATE empleados SET categoria_id = ?, sindicato_activo = ? WHERE id = ?;`;
-          await connection.query(queryUpdateEmployee, [
-            categoryId,
-            employee.adherido_a_sindicato === "Si" ? 1 : 0,
-            result.id,
-          ]);
+            // Buscamos el ultimo id de la tabla contratos
+            const queryLastIdContract = `SELECT MAX(id) as lastId FROM contratos`;
+            const [resultsLastIdContract] = await connection.query(
+              queryLastIdContract
+            );
+            const lastIdContract = resultsLastIdContract[0].lastId;
 
-          // Actualizamos el usuario
-          const queryUpdateUser = `UPDATE usuarios SET nombre = ?, apellido = ?, modified = NOW(), deleted = null WHERE id = ?;`;
-          await connection.query(queryUpdateUser, [
-            employee.nombre,
-            employee.apellido,
-            result.usuario_id,
-          ]);
+            // Insertamos el contrato
+            const queryInsertContract = `INSERT INTO contratos (id, empleado_id, empresa_id, estado, created, modified) VALUES (?, ?, ?, '1', NOW(), NOW());`;
 
-          // Tendriamos que ver si es necesario actualizar empresa_id en la tabla contratos
-          const queryUpdateContract = `UPDATE contratos SET empresa_id = ?, modified = NOW(), deleted = null WHERE empleado_id = ?;`;
-          await connection.query(queryUpdateContract, [companyId, result.id]);
+            await connection.query(queryInsertContract, [
+              lastIdContract + 1,
+              lastIdEmployee + 1,
+              companyId,
+            ]);
+          } else {
+            // Aca tenemos que validar si los datos son diferentes o iguales a los que ya tenemos
+            const result = results[0];
+
+            // Actualizamos el empleado
+            const queryUpdateEmployee = `UPDATE empleados SET categoria_id = ?, sindicato_activo = ? WHERE id = ?;`;
+            await connection.query(queryUpdateEmployee, [
+              categoryId,
+              employee.adherido_a_sindicato === "Si" ? 1 : 0,
+              result.id,
+            ]);
+
+            // Actualizamos el usuario
+            const queryUpdateUser = `UPDATE usuarios SET nombre = ?, apellido = ?, modified = NOW(), deleted = null WHERE id = ?;`;
+            await connection.query(queryUpdateUser, [
+              employee.nombre,
+              employee.apellido,
+              result.usuario_id,
+            ]);
+
+            // Tendriamos que ver si es necesario actualizar empresa_id en la tabla contratos
+            const queryUpdateContract = `UPDATE contratos SET empresa_id = ?, modified = NOW(), deleted = null WHERE empleado_id = ?;`;
+            await connection.query(queryUpdateContract, [companyId, result.id]);
+          }
+
+        } catch (error) {
+          console.error(`Error processing employee at index ${index}:`, error);
+          throw error;
+
         }
+        //Primero validamos si el empleado no exiten en la base de datos
       }
 
       // Una vez que termino de recorrer todos los empleados, buscamos cual es el ultimo id que hay en declaraciones juradas
@@ -371,62 +378,66 @@ WHERE
 
 
       // Ahora registramos datos en la tabla sueldos
-      for (const employee of employees) {
-        // Primero buscar el id del contrato de cada empleado
-        console.log(employee.cuil);
-        const queryContractId = `SELECT id FROM contratos WHERE empleado_id = ( SELECT id FROM empleados WHERE cuil = ? ORDER BY id DESC LIMIT 1 ) ORDER BY id DESC LIMIT 1;`; // Correccion aca?;
-        const [resultsContractId] = await connection.query(queryContractId, [
-          employee.cuil,
-        ]);
-        const contractId = resultsContractId[0].id;
+      for (const [index, employee] of employees.entries()) {
+        try {
+          // Primero buscar el id del contrato de cada empleado
+          console.log(employee.cuil);
+          const queryContractId = `SELECT id FROM contratos WHERE empleado_id = ( SELECT id FROM empleados WHERE cuil = ? ORDER BY id DESC LIMIT 1 ) ORDER BY id DESC LIMIT 1;`; // Correccion aca?;
+          const [resultsContractId] = await connection.query(queryContractId, [
+            employee.cuil,
+          ]);
+          const contractId = resultsContractId[0].id;
 
+          // Ahora que tenemos el id del contrato de la persona insertamos en sueldos
+          const queryLastIdSalary = `SELECT MAX(id) as lastId FROM sueldos`;
+          const [resultsLastIdSalary] = await connection.query(queryLastIdSalary);
+          const lastIdSalary = resultsLastIdSalary[0].lastId;
 
+          const queryCategoryId = `SELECT id,sueldo_basico FROM categorias WHERE nombre = ?`;
+          const [resultsCategoryId] = await connection.query(queryCategoryId, [
+            employee.categora,
+          ]);
+          const categoryId = resultsCategoryId[0].id;
+          const categorySueldoBasico = resultsCategoryId[0].sueldo_basico;
 
-        // Ahora que tenemos el id del contrato de la persona insertamos en sueldos
-        const queryLastIdSalary = `SELECT MAX(id) as lastId FROM sueldos`;
-        const [resultsLastIdSalary] = await connection.query(queryLastIdSalary);
-        const lastIdSalary = resultsLastIdSalary[0].lastId;
+          const queryInsertSalary = `INSERT INTO sueldos (id, contrato_id, declaraciones_jurada_id,adicional, sueldo_basico, categoria_id, sindicato_activo, monto, created, modified) VALUES (?, ?, ?, ?, ? , ?, ?, ?, now(), now());`;
+          await connection.query(queryInsertSalary, [
+            lastIdSalary + 1,
+            contractId,
+            lastIdDeclaration + 1,
+            Number(employee.adicionales),
+            categorySueldoBasico,
+            categoryId,
+            employee.adherido_a_sindicato === "Si" ? 1 : 0,
+            employee.sueldo_bsico,
+          ]);
 
-        const queryCategoryId = `SELECT id,sueldo_basico FROM categorias WHERE nombre = ?`;
-        const [resultsCategoryId] = await connection.query(queryCategoryId, [
-          employee.categora,
-        ]);
-        const categoryId = resultsCategoryId[0].id;
-        const categorySueldoBasico = resultsCategoryId[0].sueldo_basico;
+          // Convertimos los valores a números y nos aseguramos que sean válidos
+          const sueldoBasico = Number(employee.sueldo_bsico) || 0;
+          const adicionales = Number(employee.adicionales) || 0;
 
-        const queryInsertSalary = `INSERT INTO sueldos (id, contrato_id, declaraciones_jurada_id,adicional, sueldo_basico, categoria_id, sindicato_activo, monto, created, modified) VALUES (?, ?, ?, ?, ? , ?, ?, ?, now(), now());`;
-        await connection.query(queryInsertSalary, [
-          lastIdSalary + 1,
-          contractId,
-          lastIdDeclaration + 1,
-          Number(employee.adicionales),
-          categorySueldoBasico,
-          categoryId,
-          employee.adherido_a_sindicato === "Si" ? 1 : 0,
-          employee.sueldo_bsico,
-        ]);
+          // Calculamos el FAS (1% del sueldo básico de la categoría 1)
+          const fas = sueldoBasicoCategoriaGeneral * 0.01;
 
-        // Convertimos los valores a números y nos aseguramos que sean válidos
-        const sueldoBasico = Number(employee.sueldo_bsico) || 0;
-        const adicionales = Number(employee.adicionales) || 0;
+          // Variable para almacenar el aporte (sindicato o solidario)
+          let aportes = 0;
 
-        // Calculamos el FAS (1% del sueldo básico de la categoría 1)
-        const fas = sueldoBasicoCategoriaGeneral * 0.01;
+          // Calculamos el aporte según corresponda
+          if (employee.adherido_a_sindicato === "Si") {
+            // Si es adherente: 3% del (sueldo básico + adicionales)
+            aportes = (sueldoBasico + adicionales) * 0.03;
+          } else {
+            // Si no es adherente: 2% del sueldo básico
+            aportes = sueldoBasico * 0.02;
+          }
 
-        // Variable para almacenar el aporte (sindicato o solidario)
-        let aportes = 0;
+          // Sumamos al monto total tanto el FAS como los aportes
+          amount += fas + aportes;
+        } catch (error) {
+          console.error(`Error processing employee at index ${index}:`, error);
+          throw error;
 
-        // Calculamos el aporte según corresponda
-        if (employee.adherido_a_sindicato === "Si") {
-          // Si es adherente: 3% del (sueldo básico + adicionales)
-          aportes = (sueldoBasico + adicionales) * 0.03;
-        } else {
-          // Si no es adherente: 2% del sueldo básico
-          aportes = sueldoBasico * 0.02;
         }
-
-        // Sumamos al monto total tanto el FAS como los aportes
-        amount += fas + aportes;
       }
 
       const finalAmount = Number(amount.toFixed(2));
