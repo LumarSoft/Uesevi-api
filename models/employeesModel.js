@@ -162,7 +162,7 @@ WHERE
       ]);
 
       return [results, resultsEmployee, resultsContract];
-    } catch (error) { }
+    } catch (error) {}
   },
 
   editEmployee: async (
@@ -303,11 +303,12 @@ WHERE
             const queryUpdateContract = `UPDATE contratos SET empresa_id = ?, modified = NOW(), deleted = null WHERE empleado_id = ?;`;
             await connection.query(queryUpdateContract, [companyId, result.id]);
           }
-
         } catch (error) {
-          console.error(`Error en el primer for con el empleado: ${employee.nombre} ${index}:`, error);
+          console.error(
+            `Error en el primer for con el empleado: ${employee.nombre} ${index}:`,
+            error
+          );
           throw error;
-
         }
         //Primero validamos si el empleado no exiten en la base de datos
       }
@@ -319,8 +320,6 @@ WHERE
       );
       const lastIdDeclaration = resultsLastIdDeclaration[0].lastId;
 
-      let lastDeclarationMonth;
-      let lastDeclarationYear;
       // Buscamos el mes y el año de la ultima declaracion jurada
       const queryLastDeclaration = `SELECT mes, year FROM declaraciones_juradas WHERE empresa_id = ? ORDER BY created DESC LIMIT 1`;
       const [resultsLastDeclaration] = await connection.query(
@@ -328,60 +327,78 @@ WHERE
         [companyId]
       );
 
-      if (resultsLastDeclaration.length === 0) {
-        const currentMonth = new Date().getMonth() + 1;
-        const currentYear = new Date().getFullYear();
+      let lastDeclarationMonth;
+      let lastDeclarationYear;
 
-        if (currentMonth === 1) {
-          lastDeclarationMonth = 12;
-          lastDeclarationYear = currentYear - 1;
-        } else {
-          lastDeclarationMonth = currentMonth - 1;
-          lastDeclarationYear = currentYear;
-        }
+      if (resultsLastDeclaration.length === 0) {
+        // Si no hay declaraciones previas, tomamos el mes anterior al actual
+        const currentDate = new Date();
+        const currentMonth = currentDate.getMonth() + 1; // +1 porque getMonth() devuelve 0-11
+        const currentYear = currentDate.getFullYear();
+
+        // El mes de la declaración será el anterior al actual
+        lastDeclarationMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+        lastDeclarationYear =
+          currentMonth === 1 ? currentYear - 1 : currentYear;
       } else {
         lastDeclarationMonth = resultsLastDeclaration[0].mes;
         lastDeclarationYear = resultsLastDeclaration[0].year;
       }
 
+      const newDeclarationMonth =
+        lastDeclarationMonth === 12 ? 1 : lastDeclarationMonth + 1;
+      const newDeclarationYear =
+        lastDeclarationMonth === 12
+          ? lastDeclarationYear + 1
+          : lastDeclarationYear;
+
+      const vencimientoMonth =
+        newDeclarationMonth === 12 ? 1 : newDeclarationMonth + 1;
+      const vencimientoYear =
+        newDeclarationMonth === 12
+          ? newDeclarationYear + 1
+          : newDeclarationYear;
+
+      const vencimientoDate = new Date(vencimientoYear, vencimientoMonth, 0);
+
       // Calculamos el último día del mes de la declaración
-      const lastDayOfMonth = new Date(
-        lastDeclarationYear,
-        lastDeclarationMonth + 1,
-        0
-      ).getDate();
-      const dueDate = new Date(
-        lastDeclarationYear,
-        lastDeclarationMonth,
-        lastDayOfMonth
+      console.log(`Fecha actual: ${new Date().toISOString()}`);
+      console.log(
+        `Mes a declarar: ${newDeclarationMonth}, Año: ${newDeclarationYear}`
       );
+      console.log(
+        `Mes de vencimiento: ${vencimientoMonth}, Año: ${vencimientoYear}`
+      );
+      console.log(`Fecha de vencimiento: ${vencimientoDate.toISOString()}`);
+
       const sueldobasico = `SELECT sueldo_basico FROM categorias WHERE id = 1`;
       const [resultsSueldoBasico] = await connection.query(sueldobasico);
       const sueldoBasicoCategoriaGeneral = resultsSueldoBasico[0].sueldo_basico;
 
       // Insertamos una nueva declaracion jurada
-      const queryInsertDeclaration = `INSERT INTO declaraciones_juradas (id, fecha, empresa_id, mes, year, vencimiento, importe, sueldo_basico, created, modified)
-      VALUES (?, NOW(), ?, ?, ?, ?, ?, ?, NOW(), NOW());`;
+      const queryInsertDeclaration = `
+  INSERT INTO declaraciones_juradas (
+    id, fecha, empresa_id, mes, year, 
+    vencimiento, importe, sueldo_basico, 
+    created, modified
+  )
+  VALUES (?, NOW(), ?, ?, ?, ?, ?, ?, NOW(), NOW());
+`;
+
       await connection.query(queryInsertDeclaration, [
         lastIdDeclaration + 1,
         companyId,
-        lastDeclarationMonth === 12 ? 1 : lastDeclarationMonth + 1,
-        lastDeclarationMonth === 12
-          ? lastDeclarationYear + 1
-          : lastDeclarationYear,
-        // ultimo dia del mes de la declaracion
-        dueDate,
+        newDeclarationMonth,
+        newDeclarationYear,
+        vencimientoDate,
         0,
         sueldoBasicoCategoriaGeneral,
       ]);
-
-
 
       // Ahora registramos datos en la tabla sueldos
       for (const [index, employee] of employees.entries()) {
         try {
           // Primero buscar el id del contrato de cada empleado
-          console.log(employee.cuil);
           const queryContractId = `SELECT id FROM contratos WHERE empleado_id = ( SELECT id FROM empleados WHERE cuil = ? ORDER BY id DESC LIMIT 1 ) ORDER BY id DESC LIMIT 1;`; // Correccion aca?;
           const [resultsContractId] = await connection.query(queryContractId, [
             employee.cuil,
@@ -390,7 +407,9 @@ WHERE
 
           // Ahora que tenemos el id del contrato de la persona insertamos en sueldos
           const queryLastIdSalary = `SELECT MAX(id) as lastId FROM sueldos`;
-          const [resultsLastIdSalary] = await connection.query(queryLastIdSalary);
+          const [resultsLastIdSalary] = await connection.query(
+            queryLastIdSalary
+          );
           const lastIdSalary = resultsLastIdSalary[0].lastId;
 
           const queryCategoryId = `SELECT id,sueldo_basico FROM categorias WHERE nombre = ?`;
@@ -405,7 +424,7 @@ WHERE
             lastIdSalary + 1,
             contractId,
             lastIdDeclaration + 1,
-            Number(employee.adicionales),
+            Number(employee.adicionales) || 0,
             categorySueldoBasico,
             categoryId,
             employee.adherido_a_sindicato === "Si" ? 1 : 0,
@@ -434,9 +453,11 @@ WHERE
           // Sumamos al monto total tanto el FAS como los aportes
           amount += fas + aportes;
         } catch (error) {
-          console.error(`Error en el segundo for con el empleado: ${employee.nombre} ${index}:`, error);
+          console.error(
+            `Error en el segundo for con el empleado: ${employee.nombre} ${index}:`,
+            error
+          );
           throw error;
-
         }
       }
 
@@ -463,7 +484,12 @@ WHERE
     } catch (error) {
       // Si ocurre un error, deshacemos la transacción
       await connection.rollback();
-      console.error("Error en la transacción:", error, ". El error ocurrio en la empresa con id: ", companyId);
+      console.error(
+        "Error en la transacción:",
+        error,
+        ". El error ocurrio en la empresa con id: ",
+        companyId
+      );
     } finally {
       // Cerramos la conexión
       connection.release();
