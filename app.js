@@ -37,10 +37,11 @@ const __dirname = path.dirname(__filename);
 const setupMiddleware = () => {
   app.use(
     cors({
-      origin: ["https://uesevi.org.ar", "https://lusoinsumos.store"],
+      origin: true, // Permite cualquier origen temporalmente para pruebas
       methods: ["GET", "POST", "PUT", "DELETE"],
     })
   );
+
   app.use("/uploads", express.static(path.join(__dirname, "uploads")));
   app.use(express.json()); // Para manejar JSON
   app.use(express.urlencoded({ extended: true })); // Para manejar form-urlencoded
