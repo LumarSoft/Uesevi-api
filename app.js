@@ -37,13 +37,20 @@ const setupMiddleware = () => {
   // Configuración de cabeceras de CORS manualmente
   app.use((req, res, next) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
     res.setHeader(
       "Access-Control-Allow-Headers",
       "Origin, X-Requested-With, Content-Type, Accept"
     );
+    
+    // Maneja solicitudes preflight `OPTIONS`
+    if (req.method === "OPTIONS") {
+      return res.sendStatus(200);
+    }
+    
     next();
   });
+  
 
   app.use("/uploads", express.static(path.join(__dirname, "uploads")));
   app.use(express.json()); // Para manejar JSON

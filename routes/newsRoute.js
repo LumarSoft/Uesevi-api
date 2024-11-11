@@ -21,6 +21,11 @@ router.post(
   newsController.addNew
 ); // POST /news
 
+router.post("/test", (req, res) => {
+  console.log(req.body);
+  res.send("ok");
+});
+
 router.put(
   "/:id",
   upload.fields([

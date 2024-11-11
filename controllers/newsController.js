@@ -41,12 +41,7 @@ const newsController = {
   getLastThree: async (req, res) => {
     try {
       const latestNews = await newsModel.getLastThree(); // Asegúrate de que este método obtenga las últimas noticias correctamente
-      response(
-        res,
-        latestNews,
-        200,
-        "Últimas tres noticias obtenidas con éxito"
-      );
+      response(res, latestNews, 200, "Últimas tres noticias obtenidas con éxito");
     } catch (error) {
       handleError(res, error);
     }
