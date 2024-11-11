@@ -261,7 +261,7 @@ WHERE
               employee.cuil,
               lastIdUser + 1,
               categoryId,
-              employee.adherido_a_sindicato === "Si" ? 1 : 0,
+              employee.adherido_a_sindicato.toLowerCase() === "si" ? 1 : 0, // Convertimos a minúsculas para asegurar la comparación
             ]);
 
             // Buscamos el ultimo id de la tabla contratos
