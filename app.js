@@ -2,6 +2,8 @@ import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
 import http from "http";
+import cors from 'cors';
+
 
 import { pool } from "./db/db.js"; // Base de datos
 import "./cronJobs.js"; // Tareas programadas
@@ -34,22 +36,11 @@ const __dirname = path.dirname(__filename);
 
 // Middleware
 const setupMiddleware = () => {
-  // Configuración de cabeceras de CORS manualmente
-  app.use((req, res, next) => {
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-    res.setHeader(
-      "Access-Control-Allow-Headers",
-      "Origin, X-Requested-With, Content-Type, Accept"
-    );
-    
-    // Maneja solicitudes preflight `OPTIONS`
-    if (req.method === "OPTIONS") {
-      return res.sendStatus(200);
-    }
-    
-    next();
-  });
+  app.use(cors({
+    origin: '*', // Puedes ajustar el origen según tus necesidades
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    allowedHeaders: ["Origin", "X-Requested-With", "Content-Type", "Accept"],
+  }));
   
 
   app.use("/uploads", express.static(path.join(__dirname, "uploads")));
