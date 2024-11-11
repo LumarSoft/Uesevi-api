@@ -255,7 +255,6 @@ WHERE
 
             // Insertamos el empleado
             const queryInsertEmployee = `INSERT INTO empleados (id, cuil, usuario_id, categoria_id, sindicato_activo) VALUES (?, ?, ?, ?, ?);`;
-
             await connection.query(queryInsertEmployee, [
               lastIdEmployee + 1,
               employee.cuil,
@@ -290,7 +289,7 @@ WHERE
             const queryUpdateEmployee = `UPDATE empleados SET categoria_id = ?, sindicato_activo = ? WHERE id = ?;`;
             await connection.query(queryUpdateEmployee, [
               categoryId,
-              employee.adherido_a_sindicato === "Si" ? 1 : 0,
+              employee.adherido_a_sindicato.toLowerCase() === "si" ? 1 : 0,
               result.id,
             ]);
 
