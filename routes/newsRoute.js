@@ -16,8 +16,8 @@ router.get("/:id", newsController.getById); // GET /news/:id
 router.post(
   "/",
   upload.fields([
-    { name: "images", maxCount: 5 }, // Cambia el número según el límite de imágenes permitido
-    { name: "pdf", maxCount: 1 },
+    { name: "images", maxCount: 5, limits: { fileSize: 5 * 1024 * 1024 } }, // Cambia el número según el límite de imágenes permitido
+    { name: "pdf", maxCount: 1, limits: { fileSize: 10 * 1024 * 1024 } },
   ]),
   newsController.addNew
 );

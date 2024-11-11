@@ -2,8 +2,7 @@ import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
 import http from "http";
-import cors from 'cors';
-
+import cors from "cors";
 
 import { pool } from "./db/db.js"; // Base de datos
 import "./cronJobs.js"; // Tareas programadas
@@ -36,17 +35,17 @@ const __dirname = path.dirname(__filename);
 
 // Middleware
 const setupMiddleware = () => {
-  app.use(cors({
-    origin: '*', // Puedes ajustar el origen según tus necesidades
-    methods: ["GET", "POST", "PUT", "DELETE"],
-    allowedHeaders: ["Origin", "X-Requested-With", "Content-Type", "Accept"],
-  }));
-  
+  app.use(
+    cors({
+      origin: "*", // Puedes ajustar el origen según tus necesidades
+      methods: ["GET", "POST", "PUT", "DELETE"],
+      allowedHeaders: ["Origin", "X-Requested-With", "Content-Type", "Accept"],
+    })
+  );
 
   app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-  app.use(express.json({ limit: "10mb" })); // Ajusta el tamaño según tus necesidades
-  app.use(express.urlencoded({ extended: true, limit: "10mb" }));
-  
+  app.use(express.json({ limit: "50mb" }));
+  app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
   // Middleware para pasar el pool de conexiones a las rutas
   app.use((req, res, next) => {
