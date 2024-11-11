@@ -1,6 +1,7 @@
 import express from "express";
 import newsController from "../controllers/newsController.js";
 import upload from "../multerconfig.js";
+import cors from "cors";
 
 const router = express.Router();
 
@@ -14,12 +15,13 @@ router.get("/:id", newsController.getById); // GET /news/:id
 
 router.post(
   "/",
+  cors({ origin: "*" }), // Middleware de CORS con cualquier origen
   upload.fields([
     { name: "images", maxCount: 5 }, // Cambia el número según el límite de imágenes permitido
     { name: "pdf", maxCount: 1 },
   ]),
   newsController.addNew
-); // POST /news
+);
 
 router.post("/test", (req, res) => {
   console.log(req.body);
