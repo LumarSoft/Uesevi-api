@@ -36,12 +36,14 @@ const __dirname = path.dirname(__filename);
 const setupMiddleware = () => {
   // Configuración de cabeceras de CORS manualmente
   app.use((req, res, next) => {
-    res.header("Access-Control-Allow-Origin", "https://uesevi.org.ar");
-    res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
-    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
+    res.setHeader(
+      "Access-Control-Allow-Headers",
+      "Origin, X-Requested-With, Content-Type, Accept"
+    );
     next();
   });
-  
 
   app.use("/uploads", express.static(path.join(__dirname, "uploads")));
   app.use(express.json()); // Para manejar JSON

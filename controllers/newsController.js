@@ -76,8 +76,6 @@ const newsController = {
   },
 
   addNew: async (req, res) => {
-    res.setHeader("Access-Control-Allow-Origin", "https://uesevi.org.ar");
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
     try {
       const { headline, epigraph, body, body2, addressee } = req.body;
 
