@@ -228,8 +228,8 @@ WHERE
           ]);
           const categoryId = resultsCategoryId[0].id;
 
-          //Si el empleado no existe en la base de datos, lo agregamos
           if (results.length === 0) {
+            //Si el empleado no existe en la base de datos, lo agregamos
             // Para insertar primero va a ser necesario obtener el ultimo id de la tabla usuarios
             const queryLastId = `SELECT MAX(id) as lastId FROM usuarios`;
             const [resultsLastId] = await connection.query(queryLastId);
@@ -279,7 +279,10 @@ WHERE
               lastIdEmployee + 1,
               companyId,
             ]);
-          } else {
+          }
+
+          // Esto es lo que pasa cuando si se encuentra un empleado
+          else {
             // Aca tenemos que validar si los datos son diferentes o iguales a los que ya tenemos
             const result = results[0];
 
@@ -299,9 +302,36 @@ WHERE
               result.usuario_id,
             ]);
 
-            // Tendriamos que ver si es necesario actualizar empresa_id en la tabla contratos
-            const queryUpdateContract = `UPDATE contratos SET empresa_id = ?, modified = NOW(), deleted = null WHERE empleado_id = ?;`;
-            await connection.query(queryUpdateContract, [companyId, result.id]);
+            // Aca vamos a ver si el usuario ya existente tiene un contrato activo o no
+            const queryContract = `SELECT id FROM contratos WHERE empleado_id = ? AND deleted IS NULL ORDER BY id DESC LIMIT 1;`;
+            const [resultsContract] = await connection.query(queryContract, [
+              result.id,
+            ]);
+
+            if (resultsContract.length === 0) {
+              // Si no tiene contrato activo, insertamos uno nuevo
+              const queryLastIdContract = `SELECT MAX(id) as lastId FROM contratos`;
+              const [resultsLastIdContract] = await connection.query(
+                queryLastIdContract
+              );
+
+              const lastIdContract = resultsLastIdContract[0].lastId;
+
+              const queryInsertContract = `INSERT INTO contratos (id, empleado_id, empresa_id, estado, created, modified) VALUES (?, ?, ?, '1', NOW(), NOW());`;
+
+              await connection.query(queryInsertContract, [
+                lastIdContract + 1,
+                result.id,
+                companyId,
+              ]);
+            } else {
+              // Si tiene contrato activo, actualizamos el existente
+              const queryUpdateContract = `UPDATE contratos SET empresa_id = ?, modified = NOW(), deleted = null WHERE empleado_id = ?;`;
+              await connection.query(queryUpdateContract, [
+                companyId,
+                result.id,
+              ]);
+            }
           }
         } catch (error) {
           console.error(
