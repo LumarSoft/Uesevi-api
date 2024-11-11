@@ -35,7 +35,12 @@ const __dirname = path.dirname(__filename);
 
 // Middleware
 const setupMiddleware = () => {
-  app.use(cors({ origin: "*", methods: ["GET", "POST", "PUT", "DELETE"] }));
+  app.use(
+    cors({
+      origin: "https://uesevi.org.ar",
+      methods: ["GET", "POST", "PUT", "DELETE"],
+    })
+  );
   app.use("/uploads", express.static(path.join(__dirname, "uploads")));
   app.use(express.json()); // Para manejar JSON
   app.use(express.urlencoded({ extended: true })); // Para manejar form-urlencoded
