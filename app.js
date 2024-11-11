@@ -35,9 +35,18 @@ const __dirname = path.dirname(__filename);
 
 // Middleware
 const setupMiddleware = () => {
+  // Configuración de cabeceras de CORS manualmente
+  app.use((req, res, next) => {
+    res.header("Access-Control-Allow-Origin", "https://uesevi.org.ar");
+    res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
+    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+    next();
+  });
+
+  // Middleware de configuración automática de CORS (si aún deseas incluirlo)
   app.use(
     cors({
-      origin: true, // Permite cualquier origen temporalmente para pruebas
+      origin: ["https://uesevi.org.ar", "https://lusoinsumos.store"],
       methods: ["GET", "POST", "PUT", "DELETE"],
     })
   );
@@ -52,6 +61,7 @@ const setupMiddleware = () => {
     next();
   });
 };
+
 
 // Configuración de rutas
 const setupRoutes = () => {
