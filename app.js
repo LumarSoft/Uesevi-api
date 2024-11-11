@@ -44,8 +44,9 @@ const setupMiddleware = () => {
   
 
   app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-  app.use(express.json()); // Para manejar JSON
-  app.use(express.urlencoded({ extended: true })); // Para manejar form-urlencoded
+  app.use(express.json({ limit: "10mb" })); // Ajusta el tamaño según tus necesidades
+  app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+  
 
   // Middleware para pasar el pool de conexiones a las rutas
   app.use((req, res, next) => {

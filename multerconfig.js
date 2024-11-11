@@ -1,6 +1,6 @@
-import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
+import multer from "multer";
+import path from "path";
+import fs from "fs";
 
 // Función para asegurar que el directorio exista
 const ensureDirectoryExistence = (filePath) => {
@@ -18,7 +18,7 @@ const fileExists = (filePath) => {
 // Configuración de almacenamiento de Multer
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const folder = 'uploads';
+    const folder = "uploads";
 
     // Asegurarse de que el directorio exista
     ensureDirectoryExistence(path.join(folder, file.originalname));
@@ -26,21 +26,22 @@ const storage = multer.diskStorage({
     cb(null, folder);
   },
   filename: (req, file, cb) => {
-    const filePath = path.join('uploads', file.originalname);
+    const filePath = path.join("uploads", file.originalname);
 
     // Verificar si el archivo ya existe y generar un nombre único si es necesario
     let uniqueFileName = file.originalname;
     let counter = 1;
-    while (fileExists(path.join('uploads', uniqueFileName))) {
-      uniqueFileName = file.originalname.replace(/(\.[\w\d_-]+)$/i, `-${counter++}$1`);
+    while (fileExists(path.join("uploads", uniqueFileName))) {
+      uniqueFileName = file.originalname.replace(
+        /(\.[\w\d_-]+)$/i,
+        `-${counter++}$1`
+      );
     }
 
     cb(null, uniqueFileName);
   },
 });
 
-const upload = multer({ storage });
+const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
 
 export default upload;
-
-
