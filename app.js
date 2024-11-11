@@ -1,5 +1,4 @@
 import express from "express";
-import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
 import http from "http";
@@ -43,14 +42,6 @@ const setupMiddleware = () => {
     next();
   });
 
-  // Middleware de configuración automática de CORS (si aún deseas incluirlo)
-  app.use(
-    cors({
-      origin: ["https://uesevi.org.ar", "https://lusoinsumos.store"],
-      methods: ["GET", "POST", "PUT", "DELETE"],
-    })
-  );
-
   app.use("/uploads", express.static(path.join(__dirname, "uploads")));
   app.use(express.json()); // Para manejar JSON
   app.use(express.urlencoded({ extended: true })); // Para manejar form-urlencoded
@@ -61,7 +52,6 @@ const setupMiddleware = () => {
     next();
   });
 };
-
 
 // Configuración de rutas
 const setupRoutes = () => {
