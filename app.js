@@ -37,7 +37,7 @@ const __dirname = path.dirname(__filename);
 const setupMiddleware = () => {
   app.use(
     cors({
-      origin: "https://uesevi.org.ar",
+      origin: ["https://uesevi.org.ar", "https://lusoinsumos.store"],
       methods: ["GET", "POST", "PUT", "DELETE"],
     })
   );
