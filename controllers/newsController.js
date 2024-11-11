@@ -41,7 +41,12 @@ const newsController = {
   getLastThree: async (req, res) => {
     try {
       const latestNews = await newsModel.getLastThree(); // Asegúrate de que este método obtenga las últimas noticias correctamente
-      response(res, latestNews, 200, "Últimas tres noticias obtenidas con éxito");
+      response(
+        res,
+        latestNews,
+        200,
+        "Últimas tres noticias obtenidas con éxito"
+      );
     } catch (error) {
       handleError(res, error);
     }
@@ -71,6 +76,8 @@ const newsController = {
   },
 
   addNew: async (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "https://uesevi.org.ar");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
     try {
       const { headline, epigraph, body, body2, addressee } = req.body;
 
