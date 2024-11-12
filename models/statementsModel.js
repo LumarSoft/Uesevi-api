@@ -258,13 +258,11 @@ ORDER BY
     return result;
   },
 
-
   changeExpiration: async (id, expiration) => {
     const query = `UPDATE declaraciones_juradas SET vencimiento = ? WHERE id = ?`;
     const [result] = await pool.query(query, [expiration, id]);
     return result;
   },
-
 
   rectify: async (employees, companyId, statementId, year, month) => {
     // Inicializamos la transacción
@@ -385,25 +383,28 @@ ORDER BY
         queryLastIdDeclaration
       );
       const lastIdDeclaration = resultsLastIdDeclaration[0].lastId;
-      
+
       let monthDeclaration;
       let yearDeclaration;
       let vencimiento;
       let rectificada;
       // Ya que esto es una rectificacion tenemos que insertar dentro de declaracion jurada el mismo mes y anio que la recibimos el id
-      const queryGetMonthAndYear = `SELECT mes, year,vencimiento,rectificada FROM declaraciones_juradas WHERE id = ?`
-      const [resultMonthAndYear] = await connection.query(queryGetMonthAndYear, statementId)
+      const queryGetMonthAndYear = `SELECT mes, year,vencimiento,rectificada FROM declaraciones_juradas WHERE id = ?`;
+      const [resultMonthAndYear] = await connection.query(
+        queryGetMonthAndYear,
+        statementId
+      );
 
-      monthDeclaration = resultMonthAndYear[0].mes
-      yearDeclaration = resultMonthAndYear[0].year
-      vencimiento = resultMonthAndYear[0].vencimiento
-      rectificada = resultMonthAndYear[0].rectificada + 1
+      monthDeclaration = resultMonthAndYear[0].mes;
+      yearDeclaration = resultMonthAndYear[0].year;
+      vencimiento = resultMonthAndYear[0].vencimiento;
+      rectificada = resultMonthAndYear[0].rectificada + 1;
 
-      console.log("Esta es una declaracion que se va a rectificar")
-      console.log(monthDeclaration)
-      console.log(yearDeclaration)
-      console.log(vencimiento)
-      console.log(rectificada)
+      console.log("Esta es una declaracion que se va a rectificar");
+      console.log(monthDeclaration);
+      console.log(yearDeclaration);
+      console.log(vencimiento);
+      console.log(rectificada);
 
       const sueldobasico = `SELECT sueldo_basico FROM categorias WHERE id = 1`;
       const [resultsSueldoBasico] = await connection.query(sueldobasico);
@@ -530,6 +531,108 @@ ORDER BY
       connection.release();
     }
   },
+
+  // deleteOne: async (id) => {
+  //   const deleteDeclaracionJurada = async (declaracionId) => {
+  //     const connection = await pool.getConnection();
+  //     await connection.beginTransaction();
+  
+  //     try {
+  //         // 1. Primero verificamos que la declaración existe y obtenemos datos relevantes
+  //         const queryCheckDeclaracion = `
+  //             SELECT dj.id, dj.empresa_id, dj.mes, dj.year
+  //             FROM declaraciones_juradas dj
+  //             WHERE dj.id = ?`;
+  //         const [declaracion] = await connection.query(queryCheckDeclaracion, [declaracionId]);
+  
+  //         if (declaracion.length === 0) {
+  //             throw new Error('Declaración jurada no encontrada');
+  //         }
+  
+  //         // 2. Obtenemos los sueldos asociados para logging/auditoría
+  //         const queryGetSueldos = `
+  //             SELECT s.id, s.contrato_id, s.monto, c.empleado_id
+  //             FROM sueldos s
+  //             JOIN contratos c ON s.contrato_id = c.id
+  //             WHERE s.declaraciones_jurada_id = ?`;
+  //         const [sueldos] = await connection.query(queryGetSueldos, [declaracionId]);
+  
+  //         // 3. Opcional: Guardar log de la eliminación
+  //         const logData = {
+  //             declaracionId,
+  //             empresaId: declaracion[0].empresa_id,
+  //             mes: declaracion[0].mes,
+  //             year: declaracion[0].year,
+  //             sueldosEliminados: sueldos.length,
+  //             fecha: new Date(),
+  //         };
+  
+  //         const queryInsertLog = `
+  //             INSERT INTO logs_eliminacion (
+  //                 declaracion_id, empresa_id, mes, year, 
+  //                 sueldos_eliminados, fecha, detalles
+  //             ) VALUES (?, ?, ?, ?, ?, ?, ?)`;
+  //         await connection.query(queryInsertLog, [
+  //             logData.declaracionId,
+  //             logData.empresaId,
+  //             logData.mes,
+  //             logData.year,
+  //             logData.sueldosEliminados,
+  //             logData.fecha,
+  //             JSON.stringify(sueldos)
+  //         ]);
+  
+  //         // 4. Eliminamos los registros de sueldos asociados a esta declaración
+  //         const queryDeleteSueldos = `
+  //             DELETE FROM sueldos 
+  //             WHERE declaraciones_jurada_id = ?`;
+  //         await connection.query(queryDeleteSueldos, [declaracionId]);
+  
+  //         // 5. Eliminamos la declaración jurada
+  //         const queryDeleteDeclaracion = `
+  //             DELETE FROM declaraciones_juradas 
+  //             WHERE id = ?`;
+  //         await connection.query(queryDeleteDeclaracion, [declaracionId]);
+  
+  //         // 6. Importante: NO eliminamos los contratos, ya que son entidades independientes
+  //         //    que pueden estar relacionados con otras declaraciones juradas
+  
+  //         // 7. Commit de la transacción
+  //         await connection.commit();
+  //         return {
+  //             success: true,
+  //             message: 'Declaración jurada eliminada correctamente',
+  //             details: {
+  //                 declaracionId,
+  //                 sueldosEliminados: sueldos.length,
+  //                 log: logData
+  //             }
+  //         };
+  
+  //     } catch (error) {
+  //         // Si ocurre algún error, hacemos rollback
+  //         await connection.rollback();
+  //         throw {
+  //             success: false,
+  //             message: 'Error al eliminar la declaración jurada',
+  //             error: error.message
+  //         };
+  //     } finally {
+  //         // Liberamos la conexión
+  //         connection.release();
+  //     }
+  // };
+  
+  // // Ejemplo de uso en un endpoint
+  // app.delete('/api/declaraciones/:id', async (req, res) => {
+  //     try {
+  //         const result = await deleteDeclaracionJurada(req.params.id);
+  //         res.json(result);
+  //     } catch (error) {
+  //         res.status(500).json(error);
+  //     }
+  // });
+  // },
 };
 
 export default statementsModel;

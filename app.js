@@ -40,6 +40,11 @@ const setupMiddleware = () => {
       origin: "*", // Puedes ajustar el origen según tus necesidades
       methods: ["GET", "POST", "PUT", "DELETE"],
       allowedHeaders: ["Origin", "X-Requested-With", "Content-Type", "Accept"],
+      exposedHeaders: ["Content-Length", "Content-Type"],
+      credentials: true,
+      preflightContinue: false,
+      optionsSuccessStatus: 204,
+      maxAge: 3600
     })
   );
 

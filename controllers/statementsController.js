@@ -196,6 +196,16 @@ const statementsController = {
       handleError(res, error);
     }
   },
+
+  // deleteOne: async (req, res, next) => {
+  //   try {
+  //     const { id } = req.params;
+  //     const result = await statementsModel.deleteOne(id);
+  //     response(res, null, 200, "Declaración eliminada con éxito");
+  //   } catch (error) {
+  //     handleError(res, error);
+  //   }
+  // },
 };
 
 export default statementsController;
