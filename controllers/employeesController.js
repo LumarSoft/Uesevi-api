@@ -7,13 +7,17 @@ const handleError = (
   statusCode = 500,
   defaultMessage = "Error interno del servidor"
 ) => {
-  console.error("Error en el controlador:", error);
+  // Determina el mensaje final para enviar
+  const message = error?.message || defaultMessage;
+
+  console.error("Error en el controlador:", error || message); // Log para depuración
+
   res.status(statusCode).json({
     ok: false,
     status: "error",
     statusCode,
-    message: defaultMessage,
-    error: error?.message || null, // Detalles del error para depuración
+    message,
+    error: error?.message || null, // Detalles adicionales del error, si están disponibles
   });
 };
 
@@ -143,22 +147,26 @@ const employeesController = {
   importEmployees: async (req, res, next) => {
     try {
       const { employees, companyId } = req.body;
+      console.log("Empleados a importar:", employees); // Log para verificar los empleados a importar
 
       // Validación de CUIL duplicados
       const cuils = new Set();
       for (const employee of employees) {
-        if (cuils.has(employee.cuil)) {
+        const cuil = String(employee.cuil).trim(); // Normalizar el CUIL
+
+        if (cuils.has(cuil)) {
+          console.log(`CUIL duplicado encontrado: ${cuil}`); // Log para verificar el duplicado
           return handleError(
             res,
             null,
             400,
-            `Error: CUIL duplicado encontrado: ${employee.cuil}`
+            `Error: CUIL duplicado encontrado: ${cuil}` // Asegurarnos de enviar el CUIL en conflicto
           );
         }
-        cuils.add(employee.cuil);
+        cuils.add(cuil);
       }
 
-      // Si no hay duplicados, proceder con la importación
+      // Proceder con la importación si no hay duplicados
       const result = await employeesModel.importEmployees(employees, companyId);
       response(res, result, 201, "Empleados importados con éxito");
     } catch (error) {
