@@ -577,6 +577,39 @@ ORDER BY
       );
     }
   },
+
+  getSalaries: async (idEmployee) => {
+    // De aca me interesa la informacion basica del empleado pero sobre todo en que declaracion se presento su salario
+    const query = `SELECT
+    s.id,
+    s.monto,
+    s.remunerativo_adicional,
+    s.adicional_norem AS suma_no_remunerativa,
+    s.adicional,
+    s.sueldo_basico,
+    s.created,
+    s.modified,
+    d.id AS declaracion_id,
+    d.year,
+    d.mes,
+    d.rectificada,
+    d.vencimiento,
+    d.fecha_pago,
+    d.pago_parcial,
+    d.subtotal
+FROM
+    sueldos s
+INNER JOIN
+    declaraciones_juradas d ON s.declaraciones_jurada_id = d.id
+WHERE
+    s.contrato_id = (SELECT id FROM contratos WHERE empleado_id = ? AND deleted IS NULL)
+ORDER BY
+    d.year DESC,
+    d.mes DESC,
+    d.rectificada DESC;`;
+    const [results] = await pool.query(query, idEmployee);
+    return results;
+  },
 };
 
 export default statementsModel;

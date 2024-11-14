@@ -207,6 +207,16 @@ const statementsController = {
       handleError(res, error);
     }
   },
+
+  getSalaries: async (req, res, next) => {
+    const { idEmployee } = req.params;
+    try {
+      const salaries = await statementsModel.getSalaries(idEmployee);
+      response(res, salaries, 200, "Salarios obtenidos con éxito");
+    } catch (error) {
+      handleError(res, error);
+    }
+  },
 };
 
 export default statementsController;

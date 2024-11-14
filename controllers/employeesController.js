@@ -57,6 +57,21 @@ const employeesController = {
     }
   },
 
+  getHistoricByCompany: async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      const employees = await employeesModel.getHistoricByEmpresa(id);
+      response(
+        res,
+        employees,
+        200,
+        "Empleados históricos por empresa obtenidos con éxito"
+      );
+    } catch (error) {
+      handleError(res, error);
+    }
+  },
+
   getOldByCompany: async (req, res, next) => {
     try {
       const { id } = req.params;

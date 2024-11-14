@@ -82,6 +82,50 @@ WHERE
     return formattedResults;
   },
 
+  getHistoricByEmpresa: async (id) => {
+    const query = `
+   SELECT 
+      MIN(u.id) AS id,
+      MIN(u.apellido) AS apellido,
+      MIN(u.nombre) AS nombre,
+      MIN(u.email) AS email,
+      MIN(u.telefono) AS telefono,
+      MIN(u.estado) AS estado,
+      e.id AS empleado_id,
+      e.cuil, 
+      MIN(e.domicilio) AS domicilio,
+      MIN(e.categoria_id) AS categoria_id,
+      MIN(c.created) AS created,
+      c.empresa_id,
+      em.nombre AS nombre_empresa,
+      e.sindicato_activo 
+FROM 
+      usuarios u
+INNER JOIN 
+      empleados e ON u.id = e.usuario_id
+INNER JOIN 
+      contratos c ON e.id = c.empleado_id
+INNER JOIN 
+      empresas em ON c.empresa_id = em.id
+WHERE 
+      u.rol = 'empleado'
+      AND c.empresa_id = ?
+GROUP BY 
+      e.cuil
+    `;
+
+    const [results] = await pool.query(query, [id]);
+    console.log(results);
+
+    // Formatea las fechas
+    const formattedResults = results.map((result) => ({
+      ...result,
+      created: formatDate(result.created),
+    }));
+
+    return formattedResults;
+  },
+
   getOldByEmpresa: async (id) => {
     const query = `SELECT 
   CONCAT(apellido,', ',nombre) AS nombre, 

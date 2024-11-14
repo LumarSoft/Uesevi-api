@@ -8,6 +8,8 @@ router.get("/", employeesController.getAll); // GET /employees
 
 router.get("/company/:id", employeesController.getByCompany); // GET /employees/company/:id
 
+router.get("/company/historic/:id", employeesController.getHistoricByCompany);
+
 router.get("/company/:id/old", employeesController.getOldByCompany); // GET /employees/company/:id/old
 
 router.put("/:id", upload.none(), employeesController.editEmployee); // PUT /employees/:id
