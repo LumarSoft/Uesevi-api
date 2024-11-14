@@ -532,107 +532,51 @@ ORDER BY
     }
   },
 
-  // deleteOne: async (id) => {
-  //   const deleteDeclaracionJurada = async (declaracionId) => {
-  //     const connection = await pool.getConnection();
-  //     await connection.beginTransaction();
-  
-  //     try {
-  //         // 1. Primero verificamos que la declaración existe y obtenemos datos relevantes
-  //         const queryCheckDeclaracion = `
-  //             SELECT dj.id, dj.empresa_id, dj.mes, dj.year
-  //             FROM declaraciones_juradas dj
-  //             WHERE dj.id = ?`;
-  //         const [declaracion] = await connection.query(queryCheckDeclaracion, [declaracionId]);
-  
-  //         if (declaracion.length === 0) {
-  //             throw new Error('Declaración jurada no encontrada');
-  //         }
-  
-  //         // 2. Obtenemos los sueldos asociados para logging/auditoría
-  //         const queryGetSueldos = `
-  //             SELECT s.id, s.contrato_id, s.monto, c.empleado_id
-  //             FROM sueldos s
-  //             JOIN contratos c ON s.contrato_id = c.id
-  //             WHERE s.declaraciones_jurada_id = ?`;
-  //         const [sueldos] = await connection.query(queryGetSueldos, [declaracionId]);
-  
-  //         // 3. Opcional: Guardar log de la eliminación
-  //         const logData = {
-  //             declaracionId,
-  //             empresaId: declaracion[0].empresa_id,
-  //             mes: declaracion[0].mes,
-  //             year: declaracion[0].year,
-  //             sueldosEliminados: sueldos.length,
-  //             fecha: new Date(),
-  //         };
-  
-  //         const queryInsertLog = `
-  //             INSERT INTO logs_eliminacion (
-  //                 declaracion_id, empresa_id, mes, year, 
-  //                 sueldos_eliminados, fecha, detalles
-  //             ) VALUES (?, ?, ?, ?, ?, ?, ?)`;
-  //         await connection.query(queryInsertLog, [
-  //             logData.declaracionId,
-  //             logData.empresaId,
-  //             logData.mes,
-  //             logData.year,
-  //             logData.sueldosEliminados,
-  //             logData.fecha,
-  //             JSON.stringify(sueldos)
-  //         ]);
-  
-  //         // 4. Eliminamos los registros de sueldos asociados a esta declaración
-  //         const queryDeleteSueldos = `
-  //             DELETE FROM sueldos 
-  //             WHERE declaraciones_jurada_id = ?`;
-  //         await connection.query(queryDeleteSueldos, [declaracionId]);
-  
-  //         // 5. Eliminamos la declaración jurada
-  //         const queryDeleteDeclaracion = `
-  //             DELETE FROM declaraciones_juradas 
-  //             WHERE id = ?`;
-  //         await connection.query(queryDeleteDeclaracion, [declaracionId]);
-  
-  //         // 6. Importante: NO eliminamos los contratos, ya que son entidades independientes
-  //         //    que pueden estar relacionados con otras declaraciones juradas
-  
-  //         // 7. Commit de la transacción
-  //         await connection.commit();
-  //         return {
-  //             success: true,
-  //             message: 'Declaración jurada eliminada correctamente',
-  //             details: {
-  //                 declaracionId,
-  //                 sueldosEliminados: sueldos.length,
-  //                 log: logData
-  //             }
-  //         };
-  
-  //     } catch (error) {
-  //         // Si ocurre algún error, hacemos rollback
-  //         await connection.rollback();
-  //         throw {
-  //             success: false,
-  //             message: 'Error al eliminar la declaración jurada',
-  //             error: error.message
-  //         };
-  //     } finally {
-  //         // Liberamos la conexión
-  //         connection.release();
-  //     }
-  // };
-  
-  // // Ejemplo de uso en un endpoint
-  // app.delete('/api/declaraciones/:id', async (req, res) => {
-  //     try {
-  //         const result = await deleteDeclaracionJurada(req.params.id);
-  //         res.json(result);
-  //     } catch (error) {
-  //         res.status(500).json(error);
-  //     }
-  // });
-  // },
+  deleteOne: async (id) => {
+    // Inicializamos la transacción
+    const connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    try {
+      //Primero tenemos que saber cual es la ultima declaracion de la empresa, sin contar la que estamos borrando
+      const queryLastDeclaration = `SELECT MAX(id) as lastId FROM declaraciones_juradas WHERE empresa_id = (SELECT empresa_id FROM declaraciones_juradas WHERE id = ?) AND id != ?;`;
+
+      const [resultsLastDeclaration] = await connection.query(
+        queryLastDeclaration,
+        [id, id]
+      );
+      const lastIdDeclaration = resultsLastDeclaration[0].lastId;
+
+      //Ahora que sabemos cual es el id de la ultima declaracion sin contar la que estamos borrando vamos a reactivar los contratos anteriores. El id de los contratos esta en la tabla sueldos
+      const queryContracts = `UPDATE contratos SET deleted = NULL WHERE id IN (SELECT contrato_id FROM sueldos WHERE declaraciones_jurada_id = ?);`;
+      await connection.query(queryContracts, [lastIdDeclaration]);
+
+      // ponemos deleted los contratos
+      const queryDeleteContracts = `UPDATE contratos SET deleted = NOW() WHERE id IN (SELECT contrato_id FROM sueldos WHERE declaraciones_jurada_id = ?);`;
+      await connection.query(queryDeleteContracts, [id]);
+
+      // hacemos en la tabla sueldos los sueldos que tengan declaraciones_jurada_id = id
+      const queryDeleteSalaries = `DELETE FROM sueldos WHERE declaraciones_jurada_id = ?;`;
+      await connection.query(queryDeleteSalaries, [id]);
+
+      // Despues lo que hacemos es borrar la declaracion jurada
+      const queryDeleteDeclaration = `DELETE FROM declaraciones_juradas WHERE id = ?;`;
+      await connection.query(queryDeleteDeclaration, [id]);
+
+      // Commit de la transacción
+      await connection.commit();
+      console.log("Transacción completada con éxito.");
+    } catch (error) {
+      // Si ocurre un error, deshacemos la transacción
+      await connection.rollback();
+      console.error(
+        "Error en la transacción:",
+        error,
+        ". El error ocurrio en la empresa con id: ",
+        companyId
+      );
+    }
+  },
 };
 
 export default statementsModel;

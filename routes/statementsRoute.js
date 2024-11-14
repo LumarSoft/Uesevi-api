@@ -30,6 +30,6 @@ router.put(
   statementsController.changeExpiration
 ); // PUT /statements/:id/expiration
 
-// router.delete("/:id", statementsController.deleteOne); // DELETE /statements/:id
+router.delete("/:id", statementsController.deleteOne); // DELETE /statements/:id
 
 export default router;
