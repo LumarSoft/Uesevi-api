@@ -468,6 +468,11 @@ WHERE
         sueldoBasicoCategoriaGeneral,
       ]);
 
+      let fasTotal = 0;
+      let solidarioTotal = 0;
+      let sindicalTotal = 0;
+      let contadorPersonas = 0;
+
       // Ahora registramos datos en la tabla sueldos
       for (const [index, employee] of employees.entries()) {
         try {
@@ -500,7 +505,7 @@ WHERE
             Number(employee.adicionales) || 0,
             categorySueldoBasico,
             categoryId,
-            employee.adherido_a_sindicato === "Si" ? 1 : 0,
+            employee.adherido_a_sindicato.toLowerCase() === "si" ? 1 : 0,
             employee.sueldo_bsico,
           ]);
 
@@ -510,21 +515,27 @@ WHERE
 
           // Calculamos el FAS (1% del sueldo básico de la categoría 1)
           const fas = sueldoBasicoCategoriaGeneral * 0.01;
+          fasTotal += fas;
 
           // Variable para almacenar el aporte (sindicato o solidario)
           let aportes = 0;
 
           // Calculamos el aporte según corresponda
-          if (employee.adherido_a_sindicato === "Si") {
+          if (employee.adherido_a_sindicato.toLowerCase() === "si") {
             // Si es adherente: 3% del (sueldo básico + adicionales)
             aportes = (sueldoBasico + adicionales) * 0.03;
+            console.log("Aportes sindicales de ", employee.nombre, ":", aportes);
+            sindicalTotal += aportes;
           } else {
             // Si no es adherente: 2% del sueldo básico
             aportes = sueldoBasico * 0.02;
+            console.log("Aportes solidarios de ", employee.nombre, ":",  aportes);
+            solidarioTotal += aportes;
           }
 
           // Sumamos al monto total tanto el FAS como los aportes
           amount += fas + aportes;
+          contadorPersonas++;
         } catch (error) {
           console.error(
             `Error en el segundo for con el empleado: ${employee.nombre} ${index}:`,
@@ -533,6 +544,20 @@ WHERE
           throw error;
         }
       }
+
+      console.log("Personas ANALIZADAS:", contadorPersonas);
+      console.log("FAS total:", fasTotal);
+      console.log("Aportes sindicales total:", sindicalTotal);
+      console.log("Aportes solidarios total:", solidarioTotal);
+
+      const queryAuxiliar = `INSERT INTO auxiliar (id_declaracion, id_empresa, fas, solidario, sindical, fecha) VALUES (?, ?, ?, ?, ?, NOW());`;
+      await connection.query(queryAuxiliar, [
+        lastIdDeclaration + 1,
+        Number(companyId),
+        fasTotal,
+        solidarioTotal,
+        sindicalTotal,
+      ]);
 
       const finalAmount = Number(amount.toFixed(2));
 
