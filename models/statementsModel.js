@@ -610,6 +610,12 @@ ORDER BY
     const [results] = await pool.query(query, idEmployee);
     return results;
   },
+
+  getLastDeclaration: async (idCompany) => {
+    const query = `SELECT * FROM declaraciones_juradas WHERE empresa_id = ? ORDER BY id DESC LIMIT 1;`;
+    const [results] = await pool.query(query, idCompany);
+    return results[0];
+  },
 };
 
 export default statementsModel;
