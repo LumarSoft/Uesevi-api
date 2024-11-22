@@ -345,36 +345,51 @@ WHERE
               result.usuario_id,
             ]);
 
-            // Aca vamos a ver si el usuario ya existente tiene un contrato activo o no
-            const queryContract = `SELECT id FROM contratos WHERE empleado_id = ? AND deleted IS NULL ORDER BY id DESC LIMIT 1;`;
-            const [resultsContract] = await connection.query(queryContract, [
+            // Crear un nuevo contrato asociando al empleado con la empresa
+            const queryLastIdContract = `SELECT MAX(id) as lastId FROM contratos`;
+            const [resultsLastIdContract] = await connection.query(
+              queryLastIdContract
+            );
+            const lastIdContract = resultsLastIdContract[0].lastId;
+
+            const queryInsertContract = `INSERT INTO contratos (id, empleado_id, empresa_id, estado, created, modified) VALUES (?, ?, ?, '1', NOW(), NOW());`;
+
+            await connection.query(queryInsertContract, [
+              lastIdContract + 1,
               result.id,
+              companyId,
             ]);
 
-            if (resultsContract.length === 0) {
-              // Si no tiene contrato activo, insertamos uno nuevo
-              const queryLastIdContract = `SELECT MAX(id) as lastId FROM contratos`;
-              const [resultsLastIdContract] = await connection.query(
-                queryLastIdContract
-              );
+            // // Aca vamos a ver si el usuario ya existente tiene un contrato activo o no
+            // const queryContract = `SELECT id FROM contratos WHERE empleado_id = ? AND deleted IS NULL ORDER BY id DESC LIMIT 1;`;
+            // const [resultsContract] = await connection.query(queryContract, [
+            //   result.id,
+            // ]);
 
-              const lastIdContract = resultsLastIdContract[0].lastId;
+            // if (resultsContract.length === 0) {
+            //   // Si no tiene contrato activo, insertamos uno nuevo
+            //   const queryLastIdContract = `SELECT MAX(id) as lastId FROM contratos`;
+            //   const [resultsLastIdContract] = await connection.query(
+            //     queryLastIdContract
+            //   );
 
-              const queryInsertContract = `INSERT INTO contratos (id, empleado_id, empresa_id, estado, created, modified) VALUES (?, ?, ?, '1', NOW(), NOW());`;
+            //   const lastIdContract = resultsLastIdContract[0].lastId;
 
-              await connection.query(queryInsertContract, [
-                lastIdContract + 1,
-                result.id,
-                companyId,
-              ]);
-            } else {
-              // Si tiene contrato activo, actualizamos el existente
-              const queryUpdateContract = `UPDATE contratos SET empresa_id = ?, modified = NOW(), deleted = null WHERE empleado_id = ?;`;
-              await connection.query(queryUpdateContract, [
-                companyId,
-                result.id,
-              ]);
-            }
+            //   const queryInsertContract = `INSERT INTO contratos (id, empleado_id, empresa_id, estado, created, modified) VALUES (?, ?, ?, '1', NOW(), NOW());`;
+
+            //   await connection.query(queryInsertContract, [
+            //     lastIdContract + 1,
+            //     result.id,
+            //     companyId,
+            //   ]);
+            // } else {
+            //   // Si tiene contrato activo, actualizamos el existente
+            //   const queryUpdateContract = `UPDATE contratos SET empresa_id = ?, modified = NOW(), deleted = null WHERE empleado_id = ?;`;
+            //   await connection.query(queryUpdateContract, [
+            //     companyId,
+            //     result.id,
+            //   ]);
+            // }
           }
         } catch (error) {
           console.error(
@@ -383,7 +398,7 @@ WHERE
           );
           throw error;
         }
-        //Primero validamos si el empleado no exiten en la base de datos
+        //Primero validamos si el empleado no existen en la base de datos
       }
 
       // Una vez que termino de recorrer todos los empleados, buscamos cual es el ultimo id que hay en declaraciones juradas
@@ -524,12 +539,22 @@ WHERE
           if (employee.adherido_a_sindicato.toLowerCase() === "si") {
             // Si es adherente: 3% del (sueldo básico + adicionales)
             aportes = (sueldoBasico + adicionales) * 0.03;
-            console.log("Aportes sindicales de ", employee.nombre, ":", aportes);
+            console.log(
+              "Aportes sindicales de ",
+              employee.nombre,
+              ":",
+              aportes
+            );
             sindicalTotal += aportes;
           } else {
             // Si no es adherente: 2% del sueldo básico
             aportes = sueldoBasico * 0.02;
-            console.log("Aportes solidarios de ", employee.nombre, ":",  aportes);
+            console.log(
+              "Aportes solidarios de ",
+              employee.nombre,
+              ":",
+              aportes
+            );
             solidarioTotal += aportes;
           }
 
@@ -550,13 +575,14 @@ WHERE
       console.log("Aportes sindicales total:", sindicalTotal);
       console.log("Aportes solidarios total:", solidarioTotal);
 
-      const queryAuxiliar = `INSERT INTO auxiliar (id_declaracion, id_empresa, fas, solidario, sindical, fecha) VALUES (?, ?, ?, ?, ?, NOW());`;
+      const queryAuxiliar = `INSERT INTO auxiliar (id_declaracion, id_empresa, fas, solidario, sindical, total, fecha) VALUES (?, ?, ?, ?, ?, ?, NOW());`;
       await connection.query(queryAuxiliar, [
         lastIdDeclaration + 1,
         Number(companyId),
         fasTotal,
         solidarioTotal,
         sindicalTotal,
+        amount,
       ]);
 
       const finalAmount = Number(amount.toFixed(2));
