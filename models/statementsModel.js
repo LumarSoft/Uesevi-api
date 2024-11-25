@@ -98,9 +98,10 @@ INNER JOIN
 WHERE 
     d.id = ?
     AND c.empresa_id = ?
-ORDER BY 
+    ORDER BY 
     emp.sindicato_activo DESC,  
-    nombre_completo;
+    u.apellido ASC;       
+
 `;
 
     const [result2] = await pool.query(query2, [idDeclaracion, idEmpresa]);
