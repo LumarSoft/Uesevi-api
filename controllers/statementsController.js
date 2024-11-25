@@ -217,6 +217,23 @@ const statementsController = {
       handleError(res, error);
     }
   },
+
+  getLastDeclaration: async (req, res, next) => {
+    const { idCompany } = req.params;
+    try {
+      const lastDeclaration = await statementsModel.getLastDeclaration(
+        idCompany
+      );
+      response(
+        res,
+        lastDeclaration,
+        200,
+        "Última declaración obtenida con éxito"
+      );
+    } catch (error) {
+      handleError(res, error);
+    }
+  },
 };
 
 export default statementsController;
