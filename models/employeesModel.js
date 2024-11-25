@@ -421,7 +421,7 @@ WHERE
       if (resultsLastDeclaration.length === 0) {
         // Si no hay declaraciones previas, tomamos el mes anterior al actual
         const currentDate = new Date();
-        const currentMonth = currentDate.getMonth() + 1; // +1 porque getMonth() devuelve 0-11
+        const currentMonth = currentDate.getMonth(); // +1 porque getMonth() devuelve 0-11
         const currentYear = currentDate.getFullYear();
 
         // El mes de la declaración será el anterior al actual

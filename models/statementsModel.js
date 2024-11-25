@@ -56,7 +56,8 @@ ORDER BY
     d.fecha_pago,
     d.pago_parcial,
     d.subtotal,
-    d.sueldo_basico  
+    d.sueldo_basico,
+    d.estado
 FROM 
     contratos c
 INNER JOIN 
