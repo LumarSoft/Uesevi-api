@@ -182,7 +182,7 @@ WHERE
     } else if (state === "0" || state === "3") {
       query = `
         UPDATE declaraciones_juradas
-        SET estado = ?, pago_parcial = NULL
+        SET estado = ?, pago_parcial = NULL, fecha_pago = NULL
         WHERE id = ?
       `;
       params = [state, id];

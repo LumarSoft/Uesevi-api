@@ -3,8 +3,15 @@ import { formatDate } from "../utils/utils.js";
 
 const formModel = {
   getAll: async () => {
-    const query = `SELECT * FROM inscripcion`;
+    const query = `SELECT 
+    *,
+    CASE 
+        WHEN fecha_ingreso = '0000-00-00' THEN NULL 
+        ELSE fecha_ingreso 
+    END AS fecha_ingreso
+FROM inscripcion`;
     const [results] = await pool.query(query);
+    console.log(results);
 
     // Formatea las fechas
     const formattedResults = results.map((result) => ({
