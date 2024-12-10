@@ -8,10 +8,13 @@ const formModel = {
     CASE 
         WHEN fecha_ingreso = '0000-00-00' THEN NULL 
         ELSE fecha_ingreso 
-    END AS fecha_ingreso
+    END AS fecha_ingreso,
+    CASE
+        WHEN fecha_nacimiento = '0000-00-00' THEN NULL
+        ELSE fecha_nacimiento
+    END AS fecha_nacimiento 
 FROM inscripcion`;
     const [results] = await pool.query(query);
-    console.log(results);
 
     // Formatea las fechas
     const formattedResults = results.map((result) => ({
