@@ -206,7 +206,7 @@ WHERE
       ]);
 
       return [results, resultsEmployee, resultsContract];
-    } catch (error) {}
+    } catch (error) { }
   },
 
   editEmployee: async (
@@ -244,7 +244,7 @@ WHERE
     return result;
   },
 
-  importEmployees: async (employees, companyId) => {
+  importEmployees: async (employees, companyId, selectedMonth) => {
     // Inicializamos la transacción
     const connection = await pool.getConnection();
     await connection.beginTransaction();
@@ -359,37 +359,6 @@ WHERE
               result.id,
               companyId,
             ]);
-
-            // // Aca vamos a ver si el usuario ya existente tiene un contrato activo o no
-            // const queryContract = `SELECT id FROM contratos WHERE empleado_id = ? AND deleted IS NULL ORDER BY id DESC LIMIT 1;`;
-            // const [resultsContract] = await connection.query(queryContract, [
-            //   result.id,
-            // ]);
-
-            // if (resultsContract.length === 0) {
-            //   // Si no tiene contrato activo, insertamos uno nuevo
-            //   const queryLastIdContract = `SELECT MAX(id) as lastId FROM contratos`;
-            //   const [resultsLastIdContract] = await connection.query(
-            //     queryLastIdContract
-            //   );
-
-            //   const lastIdContract = resultsLastIdContract[0].lastId;
-
-            //   const queryInsertContract = `INSERT INTO contratos (id, empleado_id, empresa_id, estado, created, modified) VALUES (?, ?, ?, '1', NOW(), NOW());`;
-
-            //   await connection.query(queryInsertContract, [
-            //     lastIdContract + 1,
-            //     result.id,
-            //     companyId,
-            //   ]);
-            // } else {
-            //   // Si tiene contrato activo, actualizamos el existente
-            //   const queryUpdateContract = `UPDATE contratos SET empresa_id = ?, modified = NOW(), deleted = null WHERE empleado_id = ?;`;
-            //   await connection.query(queryUpdateContract, [
-            //     companyId,
-            //     result.id,
-            //   ]);
-            // }
           }
         } catch (error) {
           console.error(
@@ -398,7 +367,6 @@ WHERE
           );
           throw error;
         }
-        //Primero validamos si el empleado no existen en la base de datos
       }
 
       // Una vez que termino de recorrer todos los empleados, buscamos cual es el ultimo id que hay en declaraciones juradas
@@ -421,20 +389,23 @@ WHERE
       if (resultsLastDeclaration.length === 0) {
         // Si no hay declaraciones previas, tomamos el mes anterior al actual
         const currentDate = new Date();
-        const currentMonth = currentDate.getMonth(); // +1 porque getMonth() devuelve 0-11
+        const currentMonth = currentDate.getMonth() + 1; // +1 porque getMonth() devuelve 0-11
         const currentYear = currentDate.getFullYear();
 
         // El mes de la declaración será el anterior al actual
         lastDeclarationMonth = currentMonth === 1 ? 12 : currentMonth - 1;
-        lastDeclarationYear =
-          currentMonth === 1 ? currentYear - 1 : currentYear;
+        lastDeclarationYear = currentMonth === 1 ? currentYear - 1 : currentYear;
       } else {
-        lastDeclarationMonth = resultsLastDeclaration[0].mes;
-        lastDeclarationYear = resultsLastDeclaration[0].year;
+        const currentDate = new Date();
+        const currentYear = currentDate.getFullYear();
+
+        // Si el año seleccionado es el actual o el anterior, lo usamos directamente
+        lastDeclarationMonth = parseInt(selectedMonth);
+        lastDeclarationYear = lastDeclarationMonth === 1 ? currentYear - 1 : currentYear;
       }
 
       const newDeclarationMonth =
-        lastDeclarationMonth === 12 ? 1 : lastDeclarationMonth + 1;
+        lastDeclarationMonth === 12 ? 1 : lastDeclarationMonth;
       const newDeclarationYear =
         lastDeclarationMonth === 12
           ? lastDeclarationYear + 1
@@ -451,6 +422,7 @@ WHERE
 
       // Calculamos el último día del mes de la declaración
       console.log(`Fecha actual: ${new Date().toISOString()}`);
+      //usar selectedMonth
       console.log(
         `Mes a declarar: ${newDeclarationMonth}, Año: ${newDeclarationYear}`
       );
