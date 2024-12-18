@@ -75,7 +75,7 @@ WHERE
     const [result] = await pool.query(query, [idDeclaracion, idEmpresa]);
 
     const query2 = `SELECT 
-    CONCAT(u.nombre, ' ', u.apellido) AS nombre_completo, 
+    CONCAT(u.apellido, ' ', u.nombre) AS nombre_completo, 
     CASE WHEN emp.sindicato_activo = 1 THEN 'Sí' ELSE 'No' END AS afiliado,
     emp.cuil,
     s.sueldo_basico,
