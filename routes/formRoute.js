@@ -12,4 +12,7 @@ router.get("/complete/:cuil", formController.getToComplete); // GET /forms/compl
 
 router.post("/", upload.any(), formController.createRequest); // POST /forms
 
+router.delete("/:id", formController.deleteRequest); // DELETE /forms/:id
+
+
 export default router;

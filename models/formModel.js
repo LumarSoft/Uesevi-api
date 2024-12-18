@@ -13,7 +13,8 @@ const formModel = {
         WHEN fecha_nacimiento = '0000-00-00' THEN NULL
         ELSE fecha_nacimiento
     END AS fecha_nacimiento 
-FROM inscripcion`;
+FROM inscripcion
+ORDER BY id DESC`;
     const [results] = await pool.query(query);
 
     // Formatea las fechas
@@ -23,6 +24,18 @@ FROM inscripcion`;
     }));
 
     return formattedResults;
+  },
+
+  deleteRequest: async (id) => {
+    try {
+      const query = `DELETE FROM inscripcion WHERE id = ? LIMIT 1`;
+      const [results] = await pool.query(query, [id]);
+
+      return results;
+    } catch (error) {
+      console.error("Error al eliminar el formulario:", error);
+      throw error;
+    }
   },
 
   changeCompany: async (empresa, id) => {

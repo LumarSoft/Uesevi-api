@@ -38,13 +38,33 @@ const formController = {
     }
   },
 
+  deleteRequest: async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      const result = await formularioModel.deleteRequest(id);
+
+      if (result && result.affectedRows > 0) {
+        response(res, null, 200, "Formulario eliminado con éxito");
+      } else {
+        handleError(res, null, 404, "Formulario no encontrado");
+      }
+    } catch (error) {
+      handleError(res, error);
+    }
+  },
+
   changeCompany: async (req, res, next) => {
     try {
       const { id } = req.params;
       const { company } = req.body;
       const result = await formularioModel.changeCompany(company, id);
       if (result.affectedRows > 0) {
-        response(res, null, 200, "Empresa del formulario actualizada con éxito");
+        response(
+          res,
+          null,
+          200,
+          "Empresa del formulario actualizada con éxito"
+        );
       } else {
         handleError(res, null, 404, "Formulario no encontrado");
       }
