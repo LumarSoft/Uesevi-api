@@ -1,8 +1,89 @@
 import cron from "node-cron";
-import { pool } from "./db/db.js"; // Tu conexión a la base de datos
-// import { transporter } from "./mailer.js";
+import { pool } from "./db/db.js";
+import { transporter } from "./mailer.js";
 
-// Función existente que ya tienes para actualizar sueldos
+// Función para obtener emails de empresas
+const getCompanyEmails = async () => {
+  try {
+    const [rows] = await pool.query(
+      "SELECT email_contacto FROM empresas WHERE email_contacto IS NOT NULL"
+    );
+    return rows.map((row) => row.email_contacto);
+  } catch (error) {
+    console.error("Error obteniendo correos de empresas:", error);
+    return [];
+  }
+};
+
+// Función para enviar correo
+const sendEmail = (to, subject, text) => {
+  const mailOptions = {
+    from: "uesevirosario@gmail.com",
+    to: to,
+    subject: subject,
+    text: text,
+  };
+
+  transporter.sendMail(mailOptions, (error, info) => {
+    if (error) {
+      console.log("Error al enviar correo:", error);
+    } else {
+      console.log("Correo enviado: " + info.response);
+    }
+  });
+};
+
+// Mensaje para el día 15
+const mensajeDia15 = `
+Sr. Empresario, recuerde subir la DDJJ del mes, en caso de haberlo hecho desestime él mismo. Saludos cordiales.
+`;
+
+// Mensaje para el día 27
+const mensajeDia27 = `
+Sr. Empresario recuerde que tiene tiempo hasta el último día del mes para abonar la DDJJ a fin de evitar el cobro de intereses. En caso de haberla abonado desestime él mismo. Saludos cordiales.
+`;
+
+// Programar envío para el día 15 de cada mes a las 9:00 AM
+cron.schedule("0 9 15 * *", async () => {
+  console.log("Ejecutando envío de correos del día 15...");
+  try {
+    const correos = await getCompanyEmails();
+    
+    if (correos.length === 0) {
+      console.log("No hay correos de empresas para enviar.");
+      return;
+    }
+
+    // Enviar correo a cada empresa
+    correos.forEach((correo) => {
+      sendEmail(correo, "Notificación Mensual - Día 15", mensajeDia15);
+    });
+  } catch (error) {
+    console.error("Error en el envío de correos del día 15:", error);
+  }
+});
+
+// Programar envío para el día 27 de cada mes a las 9:00 AM
+cron.schedule("0 9 27 * *", async () => {
+  console.log("Ejecutando envío de correos del día 27...");
+  try {
+    const correos = await getCompanyEmails();
+
+    if (correos.length === 0) {
+      console.log("No hay correos de empresas para enviar.");
+      return;
+    }
+
+    // Enviar correo a cada empresa
+    correos.forEach((correo) => {
+      sendEmail(correo, "Notificación Mensual - Día 27", mensajeDia27);
+    });
+  } catch (error) {
+    console.error("Error en el envío de correos del día 27:", error);
+  }
+});
+
+// Mantener la función existente de actualización de salarios
 const checkAndUpdateSalaries = async () => {
   const now = new Date();
   const query =
@@ -11,66 +92,5 @@ const checkAndUpdateSalaries = async () => {
   await pool.query(query, [now]);
 };
 
-// Ejecutar el job cada día a la medianoche
+// Mantener el job de actualización de salarios
 cron.schedule("0 0 * * *", checkAndUpdateSalaries);
-
-// ------------------------------------------------------------------------ ENVIAR AVISOS CADA 2 MINUTOS ------------------------------------------------------------------------
-
-// // Función para obtener correos de la base de datos
-// const getEmailsFromDatabase = async () => {
-//   try {
-//     const [rows] = await pool.query(
-//       "SELECT email FROM usuarios WHERE activo = 1"
-//     );
-//     return rows.map((row) => row.email); // Devolver solo los correos electrónicos
-//   } catch (error) {
-//     console.error("Error obteniendo correos:", error);
-//     return [];
-//   }
-// };
-
-// // Función para enviar correo
-// const sendEmail = (to, subject, text) => {
-//   const mailOptions = {
-//     from: "uesevirosario@gmail.com",
-//     to: to, // Lista de destinatarios
-//     subject: subject, // Asunto del correo
-//     text: text, // Cuerpo del correo
-//   };
-
-//   transporter.sendMail(mailOptions, (error, info) => {
-//     if (error) {
-//       console.log("Error al enviar correo:", error);
-//     } else {
-//       console.log("Correo enviado: " + info.response);
-//     }
-//   });
-// };
-
-// // Programar la nueva tarea para enviar correos cada 2 minutos
-// cron.schedule("*/2 * * * *", async () => {
-//   console.log("Enviando correos...");
-
-//   try {
-//     const correos = [
-//       "marcebenitez0607@gmail.com",
-//       "bodinidev@gmail.com",
-//       "lucas.quaroni@gmail.com",
-//     ]; // Obtener correos desde la base de datos
-
-//     if (correos.length === 0) {
-//       console.log("No hay correos activos para enviar.");
-//       return;
-//     }
-
-//     const mensaje =
-//       "Recordatorio: No olvides realizar el pago de tu factura mensual. En caso de ya haberlo realizado, ignora este mensaje.";
-
-//     // Enviar correo a cada destinatario
-//     correos.forEach((correo) => {
-//       sendEmail(correo, "Recordatorio Mensual", mensaje);
-//     });
-//   } catch (error) {
-//     console.error("Error en la tarea de correos:", error);
-//   }
-// });
