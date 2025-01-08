@@ -20,4 +20,6 @@ router.put(
 
 router.get("/update-now", upload.none(), categoryController.updateNow); // PUT /categories/update-now
 
+router.get('/getGeneral',categoryController.getGeneral); // GET /categories/getGeneral
+
 export default router;

@@ -108,6 +108,15 @@ const categoryController = {
       handleError(res, error);
     }
   },
+
+  getGeneral: async (req, res, next) => {
+    try {
+      const result = await categoryModel.getGeneral();
+      response(res, result, 200, "Datos generales obtenidos con éxito");
+    } catch (error) {
+      handleError(res, error);
+    }
+  },
 };
 
 export default categoryController;
