@@ -34,6 +34,15 @@ router.delete("/:id", statementsController.deleteOne); // DELETE /statements/:id
 
 router.get("/salaries/:idEmployee", statementsController.getSalaries);
 
-router.get("/lastDeclaration/:idCompany", statementsController.getLastDeclaration);
+router.get(
+  "/lastDeclaration/:idCompany",
+  statementsController.getLastDeclaration
+);
+
+router.get(
+  "/getMissingStatements/:idCompany",
+  statementsController.getMissingStatements
+);
+
 
 export default router;

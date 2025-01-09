@@ -234,6 +234,21 @@ const statementsController = {
       handleError(res, error);
     }
   },
+
+  getMissingStatements: async (req, res, next) => {
+    try {
+      const { idCompany } = req.params;
+      const missingStatements = await statementsModel.getMissingStatements(idCompany);
+      response(
+        res,
+        missingStatements,
+        200,
+        "Declaraciones faltantes obtenidas con éxito"
+      );
+    } catch (error) {
+      handleError(res, error);
+    }
+  },
 };
 
 export default statementsController;
