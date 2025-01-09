@@ -619,6 +619,108 @@ ORDER BY
     const [results] = await pool.query(query, idCompany);
     return results[0];
   },
+
+  getMissingStatements: async (companyId) => {
+    // Obtener la primera declaración
+    const queryFirstStatement = `
+      SELECT mes, year 
+      FROM declaraciones_juradas 
+      WHERE empresa_id = ? 
+      ORDER BY year ASC, mes ASC 
+      LIMIT 1
+    `;
+    const [firstStatement] = await pool.query(queryFirstStatement, [companyId]);
+
+    if (!firstStatement.length) {
+      return { 
+        status: "NO_STATEMENTS",
+        message: "No hay declaraciones juradas cargadas",
+        data: []
+      }; 
+    }
+
+    // Obtener todas las declaraciones existentes
+    const queryAllStatements = `
+      SELECT DISTINCT mes, year
+      FROM declaraciones_juradas
+      WHERE empresa_id = ?
+      ORDER BY year, mes
+    `;
+    const [existingStatements] = await pool.query(queryAllStatements, [
+      companyId,
+    ]);
+
+    // Obtener fecha actual
+    const currentDate = new Date();
+
+    // Calcular el mes anterior
+    let previousMonth = currentDate.getMonth(); // 0-11
+    let yearOfPreviousMonth = currentDate.getFullYear();
+
+    // Ajustar el año si el mes anterior corresponde al año anterior
+    if (previousMonth === 0) {
+      // Si estamos en enero (0)
+      previousMonth = 12; // El mes anterior es diciembre
+      yearOfPreviousMonth--; // Del año anterior
+    }
+
+    // Convertir declaraciones existentes a un Set para búsqueda eficiente
+    const existingSet = new Set(
+      existingStatements.map(
+        (stmt) => `${stmt.year}-${String(stmt.mes).padStart(2, "0")}`
+      )
+    );
+
+    const missingStatements = [];
+    let checkYear = firstStatement[0].year;
+    let checkMonth = firstStatement[0].mes;
+
+    // Crear fecha de inicio para comparación
+    let checkDate = new Date(checkYear, checkMonth - 1, 1);
+
+    // Crear fecha límite (último día del mes anterior)
+    const limitDate = new Date(yearOfPreviousMonth, previousMonth, 0);
+
+    // Iterar desde la primera declaración hasta el mes anterior
+    while (checkDate <= limitDate) {
+      const yearMonth = `${checkDate.getFullYear()}-${String(
+        checkDate.getMonth() + 1
+      ).padStart(2, "0")}`;
+
+      // Si no existe la declaración para este mes/año, agregarlo a los faltantes
+      if (!existingSet.has(yearMonth)) {
+        missingStatements.push({
+          mes: checkDate.getMonth() + 1, // Convertir de 0-11 a 1-12
+          year: checkDate.getFullYear(),
+        });
+      }
+
+      // Avanzar al siguiente mes
+      checkDate.setMonth(checkDate.getMonth() + 1);
+    }
+
+    // Ordenar los resultados por año y mes
+    missingStatements.sort((a, b) => {
+      if (a.year !== b.year) return a.year - b.year;
+      return a.mes - b.mes;
+    });
+
+    // Si no hay declaraciones faltantes, significa que está al día
+    if (missingStatements.length === 0) {
+      return {
+        status: "UP_TO_DATE",
+        message: "Todas las declaraciones juradas están al día",
+        data: []
+      };
+    }
+
+    // Si hay declaraciones faltantes, las retornamos
+    return {
+        status: "PENDING_STATEMENTS",
+        message: "Hay declaraciones juradas pendientes",
+        data: missingStatements
+    };
+  }
 };
 
 export default statementsModel;

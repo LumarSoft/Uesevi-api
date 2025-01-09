@@ -244,7 +244,7 @@ WHERE
     return result;
   },
 
-  importEmployees: async (employees, companyId) => {
+  importEmployees: async (employees, companyId, month, year) => {
     // Inicializamos la transacción
     const connection = await pool.getConnection();
     await connection.beginTransaction();
@@ -407,78 +407,46 @@ WHERE
         queryLastIdDeclaration
       );
       const lastIdDeclaration = resultsLastIdDeclaration[0].lastId;
+      console.log(lastIdDeclaration);
 
-      // Buscamos el mes y el año de la ultima declaracion jurada
-      const queryLastDeclaration = `SELECT mes, year FROM declaraciones_juradas WHERE empresa_id = ? ORDER BY created DESC LIMIT 1`;
-      const [resultsLastDeclaration] = await connection.query(
-        queryLastDeclaration,
-        [companyId]
-      );
+      const monthNum = Number(month);
+      const yearNum = Number(year);
 
-      let lastDeclarationMonth;
-      let lastDeclarationYear;
+      let dueMonth, dueYear;
 
-      if (resultsLastDeclaration.length === 0) {
-        // Si no hay declaraciones previas, tomamos el mes anterior al actual
-        const currentDate = new Date();
-        const currentMonth = currentDate.getMonth(); // +1 porque getMonth() devuelve 0-11
-        const currentYear = currentDate.getFullYear();
+      // Calcula el mes y año de vencimiento (siempre será el último día del mes siguiente)
+      dueMonth = monthNum === 12 ? 1 : monthNum + 1;
+      dueYear = monthNum === 12 ? yearNum + 1 : yearNum;
 
-        // El mes de la declaración será el anterior al actual
-        lastDeclarationMonth = currentMonth === 1 ? 12 : currentMonth - 1;
-        lastDeclarationYear =
-          currentMonth === 1 ? currentYear - 1 : currentYear;
-      } else {
-        lastDeclarationMonth = resultsLastDeclaration[0].mes;
-        lastDeclarationYear = resultsLastDeclaration[0].year;
-      }
+      // Crear la fecha de vencimiento como el último día del mes siguiente
+      const dueDate = new Date(Date.UTC(dueYear, dueMonth, 0, 23, 59, 59));
 
-      const newDeclarationMonth =
-        lastDeclarationMonth === 12 ? 1 : lastDeclarationMonth + 1;
-      const newDeclarationYear =
-        lastDeclarationMonth === 12
-          ? lastDeclarationYear + 1
-          : lastDeclarationYear;
-
-      const vencimientoMonth =
-        newDeclarationMonth === 12 ? 1 : newDeclarationMonth + 1;
-      const vencimientoYear =
-        newDeclarationMonth === 12
-          ? newDeclarationYear + 1
-          : newDeclarationYear;
-
-      const vencimientoDate = new Date(vencimientoYear, vencimientoMonth, 0);
-
-      // Calculamos el último día del mes de la declaración
-      console.log(`Fecha actual: ${new Date().toISOString()}`);
-      console.log(
-        `Mes a declarar: ${newDeclarationMonth}, Año: ${newDeclarationYear}`
-      );
-      console.log(
-        `Mes de vencimiento: ${vencimientoMonth}, Año: ${vencimientoYear}`
-      );
-      console.log(`Fecha de vencimiento: ${vencimientoDate.toISOString()}`);
+      console.log("Mes declaración:", monthNum);
+      console.log("Año declaración:", yearNum);
+      console.log("Mes vencimiento:", dueMonth);
+      console.log("Año vencimiento:", dueYear);
+      console.log("Fecha vencimiento:", dueDate.toISOString());
 
       const sueldobasico = `SELECT sueldo_basico FROM categorias WHERE id = 1`;
       const [resultsSueldoBasico] = await connection.query(sueldobasico);
       const sueldoBasicoCategoriaGeneral = resultsSueldoBasico[0].sueldo_basico;
 
-      // Insertamos una nueva declaracion jurada
+      // Insert new tax declaration with correct month, year and due date
       const queryInsertDeclaration = `
-  INSERT INTO declaraciones_juradas (
-    id, fecha, empresa_id, mes, year, 
-    vencimiento, importe, sueldo_basico, 
-    created, modified
-  )
-  VALUES (?, NOW(), ?, ?, ?, ?, ?, ?, NOW(), NOW());
-`;
+        INSERT INTO declaraciones_juradas (
+          id, fecha, empresa_id, mes, year, 
+          vencimiento, importe, sueldo_basico, 
+          created, modified
+        )
+        VALUES (?, NOW(), ?, ?, ?, ?, ?, ?, NOW(), NOW());
+      `;
 
       await connection.query(queryInsertDeclaration, [
         lastIdDeclaration + 1,
         companyId,
-        newDeclarationMonth,
-        newDeclarationYear,
-        vencimientoDate,
+        month,
+        year,
+        dueDate,
         0,
         sueldoBasicoCategoriaGeneral,
       ]);
@@ -570,13 +538,13 @@ WHERE
         }
       }
 
-      console.log("Personas ANALIZADAS:", contadorPersonas);
-      console.log("FAS total:", fasTotal);
-      console.log("Aportes sindicales total:", sindicalTotal);
-      console.log("Aportes solidarios total:", solidarioTotal);
+      const lastAuxiliar = `SELECT MAX(id) as lastId FROM auxiliar`;
+      const [resultsLastAuxiliar] = await connection.query(lastAuxiliar);
+      const lastIdAuxiliar = resultsLastAuxiliar[0].lastId;
 
-      const queryAuxiliar = `INSERT INTO auxiliar (id_declaracion, id_empresa, fas, solidario, sindical, total, fecha) VALUES (?, ?, ?, ?, ?, ?, NOW());`;
+      const queryAuxiliar = `INSERT INTO auxiliar (id,id_declaracion, id_empresa, fas, solidario, sindical, total, fecha) VALUES (?,?, ?, ?, ?, ?, ?, NOW());`;
       await connection.query(queryAuxiliar, [
+        lastIdAuxiliar + 1,
         lastIdDeclaration + 1,
         Number(companyId),
         fasTotal,
