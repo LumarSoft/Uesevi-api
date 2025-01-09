@@ -161,8 +161,8 @@ const employeesController = {
 
   importEmployees: async (req, res, next) => {
     try {
-      const { employees, companyId } = req.body;
-      console.log("Empleados a importar:", employees); // Log para verificar los empleados a importar
+      console.log(req.body)
+      const { employees, companyId, month, year } = req.body;
 
       // Validación de CUIL duplicados
       const cuils = new Set();
@@ -182,7 +182,7 @@ const employeesController = {
       }
 
       // Proceder con la importación si no hay duplicados
-      const result = await employeesModel.importEmployees(employees, companyId);
+      const result = await employeesModel.importEmployees(employees, companyId, month, year);
       response(res, result, 201, "Empleados importados con éxito");
     } catch (error) {
       handleError(res, error);
