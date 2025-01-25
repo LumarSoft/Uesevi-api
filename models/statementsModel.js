@@ -160,6 +160,32 @@ WHERE
     return results;
   },
 
+  // statementsModel.js - Método getDebtorCompanies
+  getDebtorCompanies: async () => {
+    const query = `
+    SELECT 
+      e.id, 
+      e.nombre, 
+      e.cuit, 
+      SUM(dj.importe) as total_deuda
+    FROM 
+      empresas e
+    JOIN 
+      declaraciones_juradas dj ON e.id = dj.empresa_id
+    WHERE 
+      dj.estado != 'PAGADO' 
+      AND dj.fecha_pago IS NULL
+    GROUP BY 
+      e.id, e.nombre, e.cuit
+    HAVING 
+      total_deuda > 0
+  `;
+    console.log("Ejecutando query de empresas deudoras...");
+    const [results] = await pool.query(query);
+    console.log("Resultados obtenidos:", results);
+    return results;
+  },
+
   changeState: async (id, state, partial_payment) => {
     let query;
     let params;
@@ -632,11 +658,11 @@ ORDER BY
     const [firstStatement] = await pool.query(queryFirstStatement, [companyId]);
 
     if (!firstStatement.length) {
-      return { 
+      return {
         status: "NO_STATEMENTS",
         message: "No hay declaraciones juradas cargadas",
-        data: []
-      }; 
+        data: [],
+      };
     }
 
     // Obtener todas las declaraciones existentes
@@ -710,17 +736,17 @@ ORDER BY
       return {
         status: "UP_TO_DATE",
         message: "Todas las declaraciones juradas están al día",
-        data: []
+        data: [],
       };
     }
 
     // Si hay declaraciones faltantes, las retornamos
     return {
-        status: "PENDING_STATEMENTS",
-        message: "Hay declaraciones juradas pendientes",
-        data: missingStatements
+      status: "PENDING_STATEMENTS",
+      message: "Hay declaraciones juradas pendientes",
+      data: missingStatements,
     };
-  }
+  },
 };
 
 export default statementsModel;

@@ -8,6 +8,8 @@ router.get("/", statementsController.getAll); // GET /statements
 
 router.get("/:id", statementsController.getOne); // GET /statements/:id
 
+router.get("/deudoras-company", statementsController.getDebtorCompanies);
+
 router.get("/info/:idEmpresa/:idDeclaracion", statementsController.getInfo); // GET /statements/info/:idEmpresa/:idDeclaracion
 
 router.get("/company/:idCompany", statementsController.getStatementsByCompany); // GET /statements/:idCompany
@@ -43,6 +45,5 @@ router.get(
   "/getMissingStatements/:idCompany",
   statementsController.getMissingStatements
 );
-
 
 export default router;

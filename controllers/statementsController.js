@@ -164,6 +164,23 @@ const statementsController = {
     }
   },
 
+  getDebtorCompanies: async (req, res, next) => {
+    console.log("hll");
+    try {
+      const debtorCompanies = await statementsModel.getDebtorCompanies();
+      if (!debtorCompanies || debtorCompanies.length === 0) {
+        return response(res, [], 200, "No hay empresas deudoras");
+      }
+      response(
+        res,
+        debtorCompanies,
+        200,
+        "Empresas deudoras obtenidas con éxito"
+      );
+    } catch (error) {
+      handleError(res, error);
+    }
+  },
   rectify: async (req, res, next) => {
     try {
       const { employees, companyId, statementId, year, month } = req.body;
@@ -238,7 +255,9 @@ const statementsController = {
   getMissingStatements: async (req, res, next) => {
     try {
       const { idCompany } = req.params;
-      const missingStatements = await statementsModel.getMissingStatements(idCompany);
+      const missingStatements = await statementsModel.getMissingStatements(
+        idCompany
+      );
       response(
         res,
         missingStatements,
