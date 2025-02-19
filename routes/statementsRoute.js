@@ -4,11 +4,11 @@ import upload from "../multerconfig.js";
 
 const router = express.Router();
 
+router.get("/deudoras-company", statementsController.getDebtorCompanies);
+
 router.get("/", statementsController.getAll); // GET /statements
 
 router.get("/:id", statementsController.getOne); // GET /statements/:id
-
-router.get("/deudoras-company", statementsController.getDebtorCompanies);
 
 router.get("/info/:idEmpresa/:idDeclaracion", statementsController.getInfo); // GET /statements/info/:idEmpresa/:idDeclaracion
 

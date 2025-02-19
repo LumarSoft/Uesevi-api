@@ -164,22 +164,17 @@ WHERE
   getDebtorCompanies: async () => {
     const query = `
     SELECT 
-      e.id, 
-      e.nombre, 
-      e.cuit, 
-      SUM(dj.importe) as total_deuda
-    FROM 
-      empresas e
-    JOIN 
-      declaraciones_juradas dj ON e.id = dj.empresa_id
-    WHERE 
-      dj.estado != 'PAGADO' 
-      AND dj.fecha_pago IS NULL
-    GROUP BY 
-      e.id, e.nombre, e.cuit
-    HAVING 
-      total_deuda > 0
-  `;
+    dj.empresa_id, 
+    e.nombre, 
+    e.cuit, 
+    SUM(dj.importe) AS total_deuda
+    FROM declaraciones_juradas dj
+    JOIN empresas e ON dj.empresa_id = e.id
+    WHERE dj.estado <> 1 
+    AND dj.estado <> 3 
+    AND e.estado = 'Activo'
+    GROUP BY dj.empresa_id, e.nombre, e.cuit
+    `;
     console.log("Ejecutando query de empresas deudoras...");
     const [results] = await pool.query(query);
     console.log("Resultados obtenidos:", results);
@@ -423,6 +418,9 @@ WHERE
         queryGetMonthAndYear,
         statementId
       );
+      // query para cambiar el estado de la declaracion jurada ya rectificada a 3
+      const queryChangeState = `UPDATE declaraciones_juradas SET estado = 3 WHERE id = ?`;
+      await connection.query(queryChangeState, [statementId]);
 
       monthDeclaration = resultMonthAndYear[0].mes;
       yearDeclaration = resultMonthAndYear[0].year;
