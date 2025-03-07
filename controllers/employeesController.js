@@ -161,7 +161,6 @@ const employeesController = {
 
   importEmployees: async (req, res, next) => {
     try {
-      console.log(req.body)
       const { employees, companyId, month, year } = req.body;
 
       // Validación de CUIL duplicados
