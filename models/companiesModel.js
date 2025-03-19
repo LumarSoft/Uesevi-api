@@ -40,11 +40,29 @@ const companiesModel = {
 
   delete: async (id) => {
     try {
-      const query = `DELETE FROM empresas WHERE id = ?`;
-      const [results] = await pool.query(query, [id]);
-      return results;
+      // 1. Obtener el usuario_id de la empresa
+      const query1 = `SELECT usuario_id FROM empresas WHERE id = ?`;
+      const [results1] = await pool.query(query1, [id]);
+
+      // Verificar que exista la empresa y tenga usuario_id
+      if (!results1 || results1.length === 0) {
+        throw new Error("Empresa no encontrada");
+      }
+
+      const usuarioId = results1[0].usuario_id;
+
+      // 2. Eliminar la empresa
+      const query2 = `DELETE FROM empresas WHERE id = ?`;
+      const [results2] = await pool.query(query2, [id]);
+
+      // 3. Eliminar el usuario asociado
+      const query3 = `DELETE FROM usuarios WHERE id = ?`;
+      const [results3] = await pool.query(query3, [usuarioId]);
+
+      return results2;
     } catch (e) {
-      console.error(e);
+      console.error("Error al eliminar empresa y usuario:", e);
+      throw e; // Re-lanzar el error para manejarlo en la capa superior
     }
   },
 
