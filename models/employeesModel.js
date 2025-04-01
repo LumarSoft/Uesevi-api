@@ -480,7 +480,7 @@ WHERE
           const categoryId = resultsCategoryId[0].id;
           const categorySueldoBasico = resultsCategoryId[0].sueldo_basico;
 
-          const queryInsertSalary = `INSERT INTO sueldos (id, contrato_id, declaraciones_jurada_id,adicional, sueldo_basico, categoria_id, sindicato_activo, monto, adicional_norem, created, modified) VALUES (?, ?, ?, ?, ? , ?, ?, ?, ?, now(), now());`;
+          const queryInsertSalary = `INSERT INTO sueldos (id, contrato_id, declaraciones_jurada_id,adicional, sueldo_basico, categoria_id, sindicato_activo, monto, adicional_norem,remunerativo_adicional, created, modified) VALUES (?, ?, ?, ?, ? , ?, ?, ?, ?,?, now(), now());`;
           await connection.query(queryInsertSalary, [
             lastIdSalary + 1,
             contractId,
@@ -490,13 +490,15 @@ WHERE
             categoryId,
             employee.adherido_a_sindicato.toLowerCase() === "si" ? 1 : 0,
             employee.sueldo_bsico,
-            employee.suma_no_remunerativa
+            employee.suma_no_remunerativa,
+            employee.remunerativo_adicional
           ]);
 
           // Convertimos los valores a números y nos aseguramos que sean válidos
           const sueldoBasico = Number(employee.sueldo_bsico) || 0;
           const adicionales = Number(employee.adicionales) || 0;
           const sumaNoRemunerativa = Number(employee.suma_no_remunerativa) || 0;
+          const remunerativoAdicional = Number(employee.remunerativo_adicional) || 0;
 
           // Calculamos el FAS (1% del sueldo básico de la categoría 1)
           const fas = sueldoBasicoCategoriaGeneral * 0.01;
@@ -508,7 +510,7 @@ WHERE
           // Calculamos el aporte según corresponda
           if (employee.adherido_a_sindicato.toLowerCase() === "si") {
             // Si es adherente: 3% del (sueldo básico + adicionales)
-            aportes = (sueldoBasico + adicionales + sumaNoRemunerativa) * 0.03;
+            aportes = (sueldoBasico + adicionales + sumaNoRemunerativa + remunerativoAdicional) * 0.03;
             console.log(
               "Aportes sindicales de ",
               employee.nombre,
@@ -518,7 +520,7 @@ WHERE
             sindicalTotal += aportes;
           } else {
             // Si no es adherente: 2% del sueldo básico
-            aportes = (sueldoBasico + sumaNoRemunerativa) * 0.02;
+            aportes = (sueldoBasico + sumaNoRemunerativa + remunerativoAdicional) * 0.02;
             console.log(
               "Aportes solidarios de ",
               employee.nombre,
