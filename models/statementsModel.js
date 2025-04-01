@@ -173,6 +173,8 @@ WHERE
     WHERE dj.estado <> 1 
     AND dj.estado <> 3 
     AND e.estado = 'Activo'
+    AND dj.mes >= 1
+    AND dj.year >= 2025
     GROUP BY dj.empresa_id, e.nombre, e.cuit
     `;
     console.log("Ejecutando query de empresas deudoras...");
