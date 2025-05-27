@@ -184,6 +184,23 @@ const statementsController = {
   rectify: async (req, res, next) => {
     try {
       const { employees, companyId, statementId, year, month } = req.body;
+      
+      const cuils = new Set();
+      for (const employee of employees) {
+        const cuil = String(employee.cuil).trim(); 
+
+        if (cuils.has(cuil)) {
+          console.log(`CUIL duplicado encontrado: ${cuil}`);
+          return handleError(
+            res,
+            null,
+            400,
+            `Error: CUIL duplicado encontrado: ${cuil}` 
+          );
+        }
+        cuils.add(cuil);
+      }
+
       const result = await statementsModel.rectify(
         employees,
         companyId,
