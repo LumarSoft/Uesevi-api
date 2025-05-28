@@ -48,6 +48,34 @@ const setupMiddleware = () => {
     })
   );
 
+  app.use((req, res, next) => {
+    const startTime = Date.now();
+    const url = req.originalUrl;
+    const method = req.method;
+    
+    console.log(`🔹 Petición recibida: ${method} ${url}`);
+    
+    const originalSend = res.send;
+    res.send = function(body) {
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+      
+      console.log(`✅ Respuesta enviada: ${method} ${url} - Status: ${res.statusCode} - Tiempo: ${duration}ms`);
+      
+      return originalSend.call(this, body);
+    };
+    
+    res.on('close', () => {
+      if (!res.writableEnded) {
+        const endTime = Date.now();
+        const duration = endTime - startTime;
+        console.log(`❌ Conexión cerrada sin respuesta: ${method} ${url} - Tiempo: ${duration}ms`);
+      }
+    });
+    
+    next();
+  });
+
   app.use("/uploads", express.static(path.join(__dirname, "uploads")));
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
