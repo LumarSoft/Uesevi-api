@@ -21,6 +21,12 @@ const loginModel = {
     );
   },
 
+  // Función para hashear contraseña
+  hashPassword: async (password) => {
+    const saltRounds = 10;
+    return await bcrypt.hash(password, saltRounds);
+  },
+
   getUser: async (email, password) => {
     const connection = await pool.getConnection();
     try {
@@ -122,6 +128,55 @@ const loginModel = {
       throw new Error("Error en la consulta de empresa");
     } finally {
       connection.release(); // Liberar la conexión
+    }
+  },
+
+  // Verificar si existe un email de empresa
+  checkEmpresaEmail: async (email) => {
+    const connection = await pool.getConnection();
+    try {
+      const query = `SELECT COUNT(*) as count FROM usuarios WHERE email = ? AND rol = "empresa"`;
+      const [results] = await connection.query(query, [email]);
+      
+      return results[0].count > 0;
+    } catch (error) {
+      console.error("Error al verificar email de empresa:", error);
+      throw new Error("Error al verificar email de empresa");
+    } finally {
+      connection.release();
+    }
+  },
+
+  // Actualizar contraseña de empresa
+  updateEmpresaPassword: async (email, newPassword) => {
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // Verificar que el usuario existe y es una empresa
+      const queryCheck = `SELECT id FROM usuarios WHERE email = ? AND rol = "empresa"`;
+      const [results] = await connection.query(queryCheck, [email]);
+      
+      if (results.length === 0) {
+        await connection.rollback();
+        return false;
+      }
+
+      // Hashear la nueva contraseña
+      const hashedPassword = await loginModel.hashPassword(newPassword);
+
+      // Actualizar la contraseña
+      const queryUpdate = `UPDATE usuarios SET password = ? WHERE email = ?`;
+      await connection.query(queryUpdate, [hashedPassword, email]);
+
+      await connection.commit();
+      return true;
+    } catch (error) {
+      await connection.rollback();
+      console.error("Error al actualizar contraseña:", error);
+      throw new Error("Error al actualizar contraseña");
+    } finally {
+      connection.release();
     }
   },
 };
