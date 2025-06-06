@@ -3,7 +3,13 @@ import { formatDate, formatedHTML } from "../utils/utils.js";
 
 const noticiasModel = {
   getAll: async () => {
-    const query = "SELECT * FROM noticias ORDER BY created DESC";
+    const query = `
+      SELECT 
+        n.*,
+        (SELECT nombre FROM imagenes_noticias WHERE noticia_id = n.id ORDER BY id ASC LIMIT 1) as cover_image
+      FROM noticias n 
+      ORDER BY created DESC
+    `;
     const [results] = await pool.query(query);
 
     return results.map((result) => ({
@@ -11,11 +17,19 @@ const noticiasModel = {
       created: formatDate(result.created),
       modified: formatDate(result.modified),
       cuerpo: formatedHTML(result.cuerpo),
+      cover_image: result.cover_image || null
     }));
   },
 
   getLastThree: async () => {
-    const query = "SELECT * FROM noticias ORDER BY created DESC LIMIT 3";
+    const query = `
+      SELECT 
+        n.*,
+        (SELECT nombre FROM imagenes_noticias WHERE noticia_id = n.id ORDER BY id ASC LIMIT 1) as cover_image
+      FROM noticias n 
+      ORDER BY created DESC 
+      LIMIT 3
+    `;
     const [results] = await pool.query(query);
 
     return results.map((result) => ({
@@ -23,6 +37,7 @@ const noticiasModel = {
       created: formatDate(result.created),
       modified: formatDate(result.modified),
       cuerpo: formatedHTML(result.cuerpo),
+      cover_image: result.cover_image || null
     }));
   },
 
@@ -30,7 +45,8 @@ const noticiasModel = {
     const query = `
     SELECT 
       n.*, 
-      GROUP_CONCAT(i.nombre) as images 
+      GROUP_CONCAT(i.nombre ORDER BY i.id ASC) as images,
+      (SELECT nombre FROM imagenes_noticias WHERE noticia_id = n.id ORDER BY id ASC LIMIT 1) as cover_image
     FROM 
       noticias n 
     LEFT JOIN 
@@ -61,6 +77,8 @@ const noticiasModel = {
         created: formatDate(result.created),
         modified: formatDate(result.modified),
         cuerpo: formatedHTML(result.cuerpo),
+        cover_image: result.cover_image || null,
+        images: result.images ? result.images.split(',') : []
       })),
       totalPages,
     };
@@ -71,8 +89,8 @@ const noticiasModel = {
     const query = "SELECT * FROM noticias WHERE id = ?";
     const [results] = await pool.query(query, [id]);
 
-    //Luego traer todas las imagenes asociadas a esa noticia
-    const queryImages = "SELECT * FROM imagenes_noticias WHERE noticia_id = ?";
+    //Luego traer todas las imagenes asociadas a esa noticia ordenadas por ID (primera = portada)
+    const queryImages = "SELECT * FROM imagenes_noticias WHERE noticia_id = ? ORDER BY id ASC";
 
     const [resultsImages] = await pool.query(queryImages, [id]);
 
@@ -83,6 +101,7 @@ const noticiasModel = {
       modified: formatDate(results[0].modified),
       cuerpo: formatedHTML(results[0].cuerpo),
       images: resultsImages,
+      cover_image: resultsImages.length > 0 ? resultsImages[0].nombre : null
     };
   },
 
