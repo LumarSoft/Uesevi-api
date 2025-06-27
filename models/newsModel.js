@@ -133,7 +133,7 @@ const noticiasModel = {
     ]);
 
     const queryInsertImages =
-      "INSERT INTO imagenes_noticias (id,noticia_id, nombre) VALUES (?, ?, ?)";
+      "INSERT INTO imagenes_noticias (id, noticia_id, nombre, created, modified) VALUES (?, ?, ?, NOW(), NOW())";
 
     //Las imagenes pueden ser varias y tienen que sumar 1 en el id dependiendo de la ultima inserccion
 
@@ -184,31 +184,35 @@ const noticiasModel = {
       "DELETE FROM imagenes_noticias WHERE noticia_id = ?";
     await pool.query(queryDeleteImages, [id]);
 
-    // Inserción de nuevas imágenes
-    const queryInsertImages =
+    // Inserción de imágenes (nuevas y existentes que se conservan)
+    const queryInsertImagesNew =
       "INSERT INTO imagenes_noticias (id, noticia_id, nombre, created, modified) VALUES (?, ?, ?, NOW(), NOW())";
+    
+    const queryInsertImagesExisting =
+      "INSERT INTO imagenes_noticias (id, noticia_id, nombre, created, modified) VALUES (?, ?, ?, ?, NOW())";
 
-    // Verifica si `images` es un array de objetos o de strings
-    if (images.length > 0 && typeof images[0] === "string") {
-      // Opción 1: Solo rutas de imágenes nuevas
-      images.forEach(async (image, index) => {
-        await pool.query(queryInsertImages, [
-          lastIdImages + index + 1,
+    let currentImageId = lastIdImages + 1;
+
+    // Procesar todas las imágenes (existentes y nuevas)
+    for (const image of images) {
+      if (typeof image === "string") {
+        // Es una imagen nueva (solo nombre de archivo)
+        await pool.query(queryInsertImagesNew, [
+          currentImageId,
           id,
           image,
         ]);
-      });
-    } else if (images.length > 0 && typeof images[0] === "object") {
-      // Opción 2: Imágenes existentes que deseas conservar
-      images.forEach(async (image) => {
-        await pool.query(queryInsertImages, [
-          image.id,
-          image.noticia_id,
+        currentImageId++;
+      } else if (typeof image === "object" && image.nombre) {
+        // Es una imagen existente que se conserva (preservar fecha de creación original)
+        await pool.query(queryInsertImagesExisting, [
+          currentImageId,
+          id,
           image.nombre,
-          image.created,
-          image.modified,
+          image.created, // Preservar fecha de creación original
         ]);
-      });
+        currentImageId++;
+      }
     }
 
     return results;
