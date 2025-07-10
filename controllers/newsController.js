@@ -105,7 +105,7 @@ const newsController = {
 
   updateNew: async (req, res) => {
     try {
-      const { headline, epigraph, body, body2, addressee } = req.body;
+      const { headline, epigraph, body, body2, addressee, existingImages } = req.body;
       const newId = req.params.id;
 
       // Procesa las imágenes nuevas
@@ -113,17 +113,26 @@ const newsController = {
         ? req.files["images"].map((file) => file.filename)
         : [];
 
-      // Obtén las imágenes existentes
-      const existingNew = await newsModel.getById(newId);
-      const existingImages = existingNew.images || [];
+      // Obtén las imágenes existentes que se quieren conservar
+      const existingImagesIds = existingImages ? 
+        (Array.isArray(existingImages) ? existingImages : [existingImages]) : [];
 
-      // Reemplaza o conserva imágenes según corresponda
-      const images = newImages.length > 0 ? newImages : existingImages;
+      // Obtén la noticia actual para buscar las imágenes existentes
+      const existingNew = await newsModel.getById(newId);
+      const existingImagesData = existingNew.images || [];
+
+      // Filtra solo las imágenes existentes que se quieren conservar
+      const imagesToKeep = existingImagesData.filter(img => 
+        existingImagesIds.includes(img.id.toString())
+      );
+
+      // Combina las imágenes existentes que se conservan con las nuevas
+      const allImages = [...imagesToKeep, ...newImages];
 
       // Procesa el PDF
       const pdf = req.files["pdf"]
         ? req.files["pdf"][0].filename
-        : existingNew.pdf;
+        : (req.body.existingPdf || existingNew.archivo);
 
       const result = await newsModel.updateNew({
         id: newId,
@@ -132,7 +141,7 @@ const newsController = {
         body,
         body2,
         addressee,
-        images,
+        images: allImages,
         pdf,
       });
 
