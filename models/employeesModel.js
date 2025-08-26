@@ -6,7 +6,9 @@ const employeesModel = {
   getAll: async () => {
     const query = `
     SELECT DISTINCT
-    CONCAT(u.apellido, ', ', u.nombre) AS nombre,
+    u.id,
+    u.nombre,
+    u.apellido,
     u.email,
     e.cuil, 
     e.categoria_id,
