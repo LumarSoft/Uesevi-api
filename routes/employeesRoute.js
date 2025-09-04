@@ -12,6 +12,10 @@ router.get("/company/historic/:id", employeesController.getHistoricByCompany);
 
 router.get("/company/:id/old", employeesController.getOldByCompany); // GET /employees/company/:id/old
 
+router.get("/history/:empleadoId", employeesController.getEmployeeHistory); // GET /employees/history/:empleadoId
+
+router.get("/debug/:empleadoId", employeesController.debugEmployeeData); // GET /employees/debug/:empleadoId - TEMPORAL
+
 router.put("/:id", upload.none(), employeesController.editEmployee); // PUT /employees/:id
 
 router.delete("/:id", employeesController.deleteEmployee); // DELETE /employees/:id
