@@ -38,17 +38,17 @@ const mensajeDia15 = `
 Sr. Empresario, recuerde subir la DDJJ del mes, en caso de haberlo hecho desestime él mismo. Saludos cordiales.
 `;
 
-// Mensaje para el día 27
-const mensajeDia27 = `
-Sr. Empresario recuerde que tiene tiempo hasta el último día del mes para abonar la DDJJ a fin de evitar el cobro de intereses. En caso de haberla abonado desestime él mismo. Saludos cordiales.
-`;
+// // Mensaje para el día 27
+// const mensajeDia27 = `
+// Sr. Empresario recuerde que tiene tiempo hasta el último día del mes para abonar la DDJJ a fin de evitar el cobro de intereses. En caso de haberla abonado desestime él mismo. Saludos cordiales.
+// `;
 
 // Programar envío para el día 15 de cada mes a las 9:00 AM
 cron.schedule("0 9 15 * *", async () => {
   console.log("Ejecutando envío de correos del día 15...");
   try {
     const correos = await getCompanyEmails();
-    
+
     if (correos.length === 0) {
       console.log("No hay correos de empresas para enviar.");
       return;
@@ -63,25 +63,25 @@ cron.schedule("0 9 15 * *", async () => {
   }
 });
 
-// Programar envío para el día 27 de cada mes a las 9:00 AM
-cron.schedule("0 9 27 * *", async () => {
-  console.log("Ejecutando envío de correos del día 27...");
-  try {
-    const correos = await getCompanyEmails();
+// // Programar envío para el día 27 de cada mes a las 9:00 AM
+// cron.schedule("0 9 27 * *", async () => {
+//   console.log("Ejecutando envío de correos del día 27...");
+//   try {
+//     const correos = await getCompanyEmails();
 
-    if (correos.length === 0) {
-      console.log("No hay correos de empresas para enviar.");
-      return;
-    }
+//     if (correos.length === 0) {
+//       console.log("No hay correos de empresas para enviar.");
+//       return;
+//     }
 
-    // Enviar correo a cada empresa
-    correos.forEach((correo) => {
-      sendEmail(correo, "Notificación Mensual - Día 27", mensajeDia27);
-    });
-  } catch (error) {
-    console.error("Error en el envío de correos del día 27:", error);
-  }
-});
+//     // Enviar correo a cada empresa
+//     correos.forEach((correo) => {
+//       sendEmail(correo, "Notificación Mensual - Día 27", mensajeDia27);
+//     });
+//   } catch (error) {
+//     console.error("Error en el envío de correos del día 27:", error);
+//   }
+// });
 
 // Mantener la función existente de actualización de salarios
 const checkAndUpdateSalaries = async () => {
