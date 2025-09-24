@@ -6,10 +6,8 @@ const dashboardModel = {
     // Solo se cuentan empresas con estado = 'Activo' y empleados de esas empresas
     const query = `SELECT 
     (SELECT COUNT(*) 
-     FROM usuarios u 
-     JOIN empresas em ON u.id = em.usuario_id 
-     WHERE u.rol = 'empresa' 
-       AND em.estado = 'Activo') AS total_empresas,
+     FROM empresas em  
+     WHERE em.estado = 'Activo') AS total_empresas,
     (SELECT COUNT(DISTINCT u.id) 
      FROM usuarios u
      JOIN empleados e ON u.id = e.usuario_id
