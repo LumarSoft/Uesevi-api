@@ -48,7 +48,7 @@ cron.schedule("0 9 15 * *", async () => {
   console.log("Ejecutando envío de correos del día 15...");
   try {
     const correos = await getCompanyEmails();
-    
+
     if (correos.length === 0) {
       console.log("No hay correos de empresas para enviar.");
       return;
