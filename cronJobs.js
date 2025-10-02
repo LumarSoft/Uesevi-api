@@ -38,7 +38,7 @@ const mensajeDia15 = `
 Sr. Empresario, recuerde subir la DDJJ del mes, en caso de haberlo hecho desestime él mismo. Saludos cordiales.
 `;
 
-// // Mensaje para el día 27
+// Mensaje para el día 27 - COMENTADO: Notificación deshabilitada
 // const mensajeDia27 = `
 // Sr. Empresario recuerde que tiene tiempo hasta el último día del mes para abonar la DDJJ a fin de evitar el cobro de intereses. En caso de haberla abonado desestime él mismo. Saludos cordiales.
 // `;
@@ -63,7 +63,7 @@ cron.schedule("0 9 15 * *", async () => {
   }
 });
 
-// // Programar envío para el día 27 de cada mes a las 9:00 AM
+// COMENTADO: Programar envío para el día 27 de cada mes a las 9:00 AM - NOTIFICACIÓN DESHABILITADA
 // cron.schedule("0 9 27 * *", async () => {
 //   console.log("Ejecutando envío de correos del día 27...");
 //   try {

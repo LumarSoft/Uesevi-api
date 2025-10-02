@@ -7,10 +7,15 @@ const employeesModel = {
     const query = `
     SELECT DISTINCT
     u.id,
-    u.nombre,
     u.apellido,
+    u.nombre,
+    CONCAT(u.apellido, ', ', u.nombre) AS nombre_completo,
     u.email,
+    u.telefono,
+    u.estado,
+    e.id AS empleado_id,
     e.cuil, 
+    e.domicilio,
     e.categoria_id,
     c.created,
     c.empresa_id,
@@ -26,7 +31,7 @@ INNER JOIN
     empresas em ON c.empresa_id = em.id
 WHERE 
     u.rol = 'empleado'
-    AND c.estado = 1 
+    AND c.estado = '1' 
     AND c.deleted IS NULL;
     `;
     const [results] = await pool.query(query);
@@ -153,6 +158,173 @@ WHERE
 `;
     const [results] = await pool.query(query, [id]);
     return results;
+  },
+
+  // Nuevo método para obtener el historial completo de un empleado
+  getEmployeeHistory: async (empleadoId) => {
+    console.log(
+      "🔍 Ejecutando consulta de historial para empleadoId:",
+      empleadoId
+    );
+
+    const query = `
+    SELECT 
+      c.id as contrato_id,
+      c.created as fecha_inicio,
+      c.deleted as fecha_fin,
+      c.estado as estado_contrato,
+      c.modified as ultima_modificacion,
+      em.id as empresa_id,
+      em.nombre as nombre_empresa,
+      em.cuit as cuit_empresa,
+      em.estado as estado_empresa,
+      u.nombre,
+      u.apellido,
+      e.cuil,
+      cat.nombre as categoria,
+      CASE 
+        WHEN c.deleted IS NULL AND c.estado = '1' THEN 'Activo'
+        WHEN c.deleted IS NOT NULL THEN 'Finalizado'
+        ELSE 'Inactivo'
+      END as estado_descripcion
+    FROM 
+      contratos c
+    INNER JOIN 
+      empleados e ON c.empleado_id = e.id
+    INNER JOIN 
+      usuarios u ON e.usuario_id = u.id
+    INNER JOIN 
+      empresas em ON c.empresa_id = em.id
+    LEFT JOIN 
+      categorias cat ON e.categoria_id = cat.id
+    WHERE 
+      e.id = ?
+    ORDER BY 
+      c.created DESC, c.modified DESC
+    `;
+
+    console.log("📝 Query SQL:", query);
+    console.log("🎯 Parámetros:", [empleadoId]);
+
+    const [results] = await pool.query(query, [empleadoId]);
+    console.log("📊 Resultados de la consulta:", results.length, "registros");
+
+    if (results.length > 0) {
+      console.log("📋 Primer resultado:", results[0]);
+    }
+
+    // Agrupar contratos por empresa
+    const groupedByCompany = {};
+
+    results.forEach((result) => {
+      const empresaId = result.empresa_id;
+
+      if (!groupedByCompany[empresaId]) {
+        groupedByCompany[empresaId] = {
+          empresa_id: result.empresa_id,
+          nombre_empresa: result.nombre_empresa,
+          cuit_empresa: result.cuit_empresa,
+          estado_empresa: result.estado_empresa,
+          nombre: result.nombre,
+          apellido: result.apellido,
+          cuil: result.cuil,
+          categoria: result.categoria,
+          contratos: [],
+          fecha_inicio_primera: result.fecha_inicio,
+          fecha_fin_ultima: result.fecha_fin,
+          estado_descripcion: "Activo", // Se actualizará después
+        };
+      }
+
+      // Agregar contrato al grupo
+      groupedByCompany[empresaId].contratos.push({
+        contrato_id: result.contrato_id,
+        fecha_inicio: result.fecha_inicio,
+        fecha_fin: result.fecha_fin,
+        estado_contrato: result.estado_contrato,
+        ultima_modificacion: result.ultima_modificacion,
+        estado_descripcion: result.estado_descripcion,
+      });
+
+      // Actualizar fecha de inicio (la más antigua)
+      if (
+        new Date(result.fecha_inicio) <
+        new Date(groupedByCompany[empresaId].fecha_inicio_primera)
+      ) {
+        groupedByCompany[empresaId].fecha_inicio_primera = result.fecha_inicio;
+      }
+
+      // Actualizar fecha de fin (la más reciente o null si hay algún activo)
+      if (result.fecha_fin === null) {
+        groupedByCompany[empresaId].fecha_fin_ultima = null;
+        groupedByCompany[empresaId].estado_descripcion = "Activo";
+      } else if (groupedByCompany[empresaId].fecha_fin_ultima !== null) {
+        if (
+          new Date(result.fecha_fin) >
+          new Date(groupedByCompany[empresaId].fecha_fin_ultima)
+        ) {
+          groupedByCompany[empresaId].fecha_fin_ultima = result.fecha_fin;
+        }
+      }
+    });
+
+    // Convertir el objeto agrupado en array y determinar estado final
+    const groupedResults = Object.values(groupedByCompany).map((group) => {
+      // Determinar estado final del grupo
+      const hasActiveContract = group.contratos.some(
+        (c) => c.estado_descripcion === "Activo"
+      );
+      if (hasActiveContract) {
+        group.estado_descripcion = "Activo";
+        group.fecha_fin_ultima = null;
+      } else {
+        group.estado_descripcion = "Finalizado";
+      }
+
+      // Función para formatear solo fecha (sin hora)
+      const formatDateOnly = (dateString) => {
+        if (!dateString) return null;
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return null;
+        return date.toLocaleDateString("es-AR", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+        });
+      };
+
+      return {
+        ...group,
+        fecha_inicio: formatDateOnly(group.fecha_inicio_primera),
+        fecha_fin: group.fecha_fin_ultima
+          ? formatDateOnly(group.fecha_fin_ultima)
+          : null,
+        total_contratos: group.contratos.length,
+        // Formatear fechas en contratos individuales
+        contratos: group.contratos.map((c) => ({
+          ...c,
+          fecha_inicio: formatDateOnly(c.fecha_inicio),
+          fecha_fin: c.fecha_fin ? formatDateOnly(c.fecha_fin) : null,
+          ultima_modificacion: formatDate(c.ultima_modificacion), // Esta sí puede tener hora
+        })),
+      };
+    });
+
+    // Ordenar por fecha de inicio (más reciente primero)
+    groupedResults.sort(
+      (a, b) =>
+        new Date(b.fecha_inicio_primera) - new Date(a.fecha_inicio_primera)
+    );
+
+    console.log("📊 Resultados agrupados:", groupedResults.length, "empresas");
+    if (groupedResults.length > 0) {
+      console.log(
+        "📋 Primer resultado agrupado:",
+        JSON.stringify(groupedResults[0], null, 2)
+      );
+    }
+
+    return groupedResults;
   },
 
   addEmployee: async (
@@ -493,7 +665,7 @@ WHERE
             employee.adherido_a_sindicato.toLowerCase() === "si" ? 1 : 0,
             employee.sueldo_bsico,
             employee.suma_no_remunerativa,
-            employee.ad_remunerativo
+            employee.ad_remunerativo,
           ]);
 
           // Convertimos los valores a números y nos aseguramos que sean válidos
@@ -512,7 +684,12 @@ WHERE
           // Calculamos el aporte según corresponda
           if (employee.adherido_a_sindicato.toLowerCase() === "si") {
             // Si es adherente: 3% del (sueldo básico + adicionales)
-            aportes = (sueldoBasico + adicionales + sumaNoRemunerativa + remunerativoAdicional) * 0.03;
+            aportes =
+              (sueldoBasico +
+                adicionales +
+                sumaNoRemunerativa +
+                remunerativoAdicional) *
+              0.03;
             console.log(
               "Aportes sindicales de ",
               employee.nombre,
@@ -522,7 +699,9 @@ WHERE
             sindicalTotal += aportes;
           } else {
             // Si no es adherente: 2% del sueldo básico
-            aportes = (sueldoBasico + sumaNoRemunerativa + remunerativoAdicional) * 0.02;
+            aportes =
+              (sueldoBasico + sumaNoRemunerativa + remunerativoAdicional) *
+              0.02;
             console.log(
               "Aportes solidarios de ",
               employee.nombre,

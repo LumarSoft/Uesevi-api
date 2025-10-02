@@ -1,4 +1,5 @@
 import employeesModel from "../models/employeesModel.js";
+import { pool } from "../db/db.js";
 
 // Función de manejo de errores
 const handleError = (
@@ -184,6 +185,62 @@ const employeesController = {
       const result = await employeesModel.importEmployees(employees, companyId, month, year);
       response(res, result, 201, "Empleados importados con éxito");
     } catch (error) {
+      handleError(res, error);
+    }
+  },
+
+  // Nuevo método para obtener el historial de un empleado
+  getEmployeeHistory: async (req, res, next) => {
+    try {
+      const { empleadoId } = req.params;
+      console.log("🔍 Buscando historial para empleadoId:", empleadoId);
+      
+      const history = await employeesModel.getEmployeeHistory(empleadoId);
+      console.log("📋 Historial encontrado:", history.length, "registros");
+      
+      if (history.length === 0) {
+        return response(res, [], 200, "No se encontró historial para este empleado");
+      }
+      
+      response(res, history, 200, "Historial del empleado obtenido con éxito");
+    } catch (error) {
+      console.error("❌ Error al obtener historial:", error);
+      handleError(res, error);
+    }
+  },
+
+  // Método temporal para debugging - verificar datos disponibles
+  debugEmployeeData: async (req, res, next) => {
+    try {
+      const { empleadoId } = req.params;
+      
+      // Verificar si el empleado existe
+      const empleadoQuery = `SELECT * FROM empleados WHERE id = ?`;
+      const [empleadoResult] = await pool.query(empleadoQuery, [empleadoId]);
+      
+      // Verificar contratos del empleado
+      const contratosQuery = `SELECT * FROM contratos WHERE empleado_id = ?`;
+      const [contratosResult] = await pool.query(contratosQuery, [empleadoId]);
+      
+      // Verificar usuario asociado
+      let usuarioResult = [];
+      if (empleadoResult.length > 0) {
+        const usuarioQuery = `SELECT * FROM usuarios WHERE id = ?`;
+        [usuarioResult] = await pool.query(usuarioQuery, [empleadoResult[0].usuario_id]);
+      }
+      
+      const debugData = {
+        empleadoId: empleadoId,
+        empleado: empleadoResult,
+        contratos: contratosResult,
+        usuario: usuarioResult,
+        totalContratos: contratosResult.length
+      };
+      
+      console.log("🐛 Debug data:", debugData);
+      response(res, debugData, 200, "Datos de debugging obtenidos");
+    } catch (error) {
+      console.error("❌ Error en debugging:", error);
       handleError(res, error);
     }
   },
