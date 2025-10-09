@@ -1,5 +1,6 @@
 import companiesModel from "../models/companiesModel.js";
 import bcrypt from "bcrypt";
+import { sendNewCompanyNotification } from "../utils/utils.js";
 
 // Función de manejo de errores
 const handleError = (
@@ -131,6 +132,26 @@ const companiesController = {
         username,
         hashedPassword
       );
+
+      // Enviar correo de notificación (no bloquea la respuesta si falla)
+      try {
+        const companyData = {
+          cuit,
+          name,
+          address,
+          phone,
+          location,
+          contactName,
+          contactLastName,
+          contactPhone,
+          contactEmail,
+        };
+
+        await sendNewCompanyNotification(companyData);
+      } catch (emailError) {
+        // Log del error pero no afecta la respuesta al cliente
+        console.error("Error al enviar correo de notificación:", emailError);
+      }
 
       // Respuesta exitosa
       response(res, null, 201, "Empresa creada con éxito");

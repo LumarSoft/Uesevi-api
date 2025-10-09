@@ -7,7 +7,7 @@ const companiesModel = {
       SELECT em.*, us.nombre as nombre_usuario, us.apellido, us.telefono as telefono_usuario
       FROM empresas em
       INNER JOIN usuarios us ON us.id = em.usuario_id
-      ORDER BY CASE WHEN em.estado = 'pendiente' THEN 0 ELSE 1 END, em.estado ASC
+      ORDER BY CASE WHEN em.estado = 'pendiente' THEN 0 ELSE 1 END, em.estado ASC, em.created DESC
     `;
 
     const [results] = await pool.query(query);
