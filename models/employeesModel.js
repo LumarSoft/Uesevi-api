@@ -327,6 +327,210 @@ WHERE
     return groupedResults;
   },
 
+  // Método para búsqueda de empleados con filtros
+  searchEmployees: async (
+    searchTerm,
+    companyId = null,
+    limit = 50,
+    offset = 0
+  ) => {
+    try {
+      // Sanitizar y preparar el término de búsqueda
+      const sanitizedTerm = searchTerm.trim();
+      if (!sanitizedTerm || sanitizedTerm.length < 2) {
+        return { employees: [], total: 0 };
+      }
+
+      // Dividir el término de búsqueda en palabras
+      const words = sanitizedTerm
+        .split(/\s+/)
+        .filter((word) => word.length > 1);
+
+      let query,
+        countQuery,
+        queryParams = [];
+
+      if (words.length === 1) {
+        // Búsqueda de una sola palabra
+        const word = words[0];
+
+        query = `
+          SELECT 
+            u.id,
+            u.apellido,
+            u.nombre,
+            CONCAT(u.apellido, ', ', u.nombre) AS nombre_completo,
+            u.email,
+            u.telefono,
+            u.estado,
+            e.id AS empleado_id,
+            e.cuil, 
+            e.domicilio,
+            e.categoria_id,
+            c.created,
+            c.empresa_id,
+            em.nombre AS nombre_empresa,
+            e.sindicato_activo
+          FROM 
+            usuarios u
+          INNER JOIN 
+            empleados e ON u.id = e.usuario_id
+          INNER JOIN 
+            contratos c ON e.id = c.empleado_id AND c.estado = '1' AND c.deleted IS NULL
+          INNER JOIN 
+            empresas em ON c.empresa_id = em.id
+          WHERE 
+            u.rol = 'empleado'
+            AND u.deleted IS NULL
+            AND (
+              u.apellido LIKE ? OR
+              u.nombre LIKE ? OR
+              e.cuil = ? OR
+              e.cuil LIKE ? OR
+              em.nombre LIKE ?
+            )
+        `;
+
+        countQuery = `
+          SELECT COUNT(u.id) as total
+          FROM 
+            usuarios u
+          INNER JOIN 
+            empleados e ON u.id = e.usuario_id
+          INNER JOIN 
+            contratos c ON e.id = c.empleado_id AND c.estado = '1' AND c.deleted IS NULL
+          INNER JOIN 
+            empresas em ON c.empresa_id = em.id
+          WHERE 
+            u.rol = 'empleado'
+            AND u.deleted IS NULL
+            AND (
+              u.apellido LIKE ? OR
+              u.nombre LIKE ? OR
+              e.cuil = ? OR
+              e.cuil LIKE ? OR
+              em.nombre LIKE ?
+            )
+        `;
+
+        const containsPattern = `%${word}%`;
+        const exactPattern = word;
+
+        queryParams.push(
+          containsPattern, // u.apellido LIKE ?
+          containsPattern, // u.nombre LIKE ?
+          exactPattern, // e.cuil = ?
+          containsPattern, // e.cuil LIKE ?
+          containsPattern // em.nombre LIKE ?
+        );
+      } else {
+        // Búsqueda de múltiples palabras - cada palabra debe estar presente
+        const wordConditions = words
+          .map(
+            () => `(
+          u.apellido LIKE ? OR 
+          u.nombre LIKE ? OR 
+          em.nombre LIKE ?
+        )`
+          )
+          .join(" AND ");
+
+        query = `
+          SELECT 
+            u.id,
+            u.apellido,
+            u.nombre,
+            CONCAT(u.apellido, ', ', u.nombre) AS nombre_completo,
+            u.email,
+            u.telefono,
+            u.estado,
+            e.id AS empleado_id,
+            e.cuil, 
+            e.domicilio,
+            e.categoria_id,
+            c.created,
+            c.empresa_id,
+            em.nombre AS nombre_empresa,
+            e.sindicato_activo
+          FROM 
+            usuarios u
+          INNER JOIN 
+            empleados e ON u.id = e.usuario_id
+          INNER JOIN 
+            contratos c ON e.id = c.empleado_id AND c.estado = '1' AND c.deleted IS NULL
+          INNER JOIN 
+            empresas em ON c.empresa_id = em.id
+          WHERE 
+            u.rol = 'empleado'
+            AND u.deleted IS NULL
+            AND (${wordConditions})
+        `;
+
+        countQuery = `
+          SELECT COUNT(u.id) as total
+          FROM 
+            usuarios u
+          INNER JOIN 
+            empleados e ON u.id = e.usuario_id
+          INNER JOIN 
+            contratos c ON e.id = c.empleado_id AND c.estado = '1' AND c.deleted IS NULL
+          INNER JOIN 
+            empresas em ON c.empresa_id = em.id
+          WHERE 
+            u.rol = 'empleado'
+            AND u.deleted IS NULL
+            AND (${wordConditions})
+        `;
+
+        // Agregar parámetros para cada palabra (3 parámetros por palabra)
+        words.forEach((word) => {
+          const containsPattern = `%${word}%`;
+          queryParams.push(
+            containsPattern, // u.apellido LIKE ?
+            containsPattern, // u.nombre LIKE ?
+            containsPattern // em.nombre LIKE ?
+          );
+        });
+      }
+
+      // Agregar filtro por empresa si se especifica
+      if (companyId) {
+        query += ` AND c.empresa_id = ?`;
+        countQuery += ` AND c.empresa_id = ?`;
+        queryParams.push(companyId);
+      }
+
+      // Agregar ordenamiento y paginación (simplificado)
+      query += ` 
+        ORDER BY u.apellido ASC, u.nombre ASC
+        LIMIT ? OFFSET ?
+      `;
+      queryParams.push(limit, offset);
+
+      // Parámetros para el conteo (mismos parámetros sin paginación)
+      let countParams = queryParams.slice(0, -2); // Remover LIMIT y OFFSET
+
+      // Ejecutar consultas
+      const [employees] = await pool.query(query, queryParams);
+      const [countResult] = await pool.query(countQuery, countParams);
+
+      // Formatear fechas
+      const formattedEmployees = employees.map((employee) => ({
+        ...employee,
+        created: formatDate(employee.created),
+      }));
+
+      return {
+        employees: formattedEmployees,
+        total: countResult[0].total,
+        searchTerm: sanitizedTerm,
+      };
+    } catch (error) {
+      console.error("Error en searchEmployees:", error);
+      throw error;
+    }
+  },
+
   addEmployee: async (
     firstName,
     lastName,

@@ -6,6 +6,8 @@ const router = express.Router();
 
 router.get("/", employeesController.getAll); // GET /employees
 
+router.get("/search", employeesController.searchEmployees); // GET /employees/search?q=term&company_id=1&limit=50&offset=0
+
 router.get("/company/:id", employeesController.getByCompany); // GET /employees/company/:id
 
 router.get("/company/historic/:id", employeesController.getHistoricByCompany);
