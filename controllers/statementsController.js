@@ -88,6 +88,23 @@ const statementsController = {
     }
   },
 
+  getStatementsByCompanyFiltered: async (req, res, next) => {
+    try {
+      const { idCompany } = req.params;
+      const statements = await statementsModel.getStatementsByCompany(
+        idCompany
+      );
+      response(
+        res,
+        statements,
+        200,
+        "Declaraciones filtradas obtenidas con éxito"
+      );
+    } catch (error) {
+      handleError(res, error);
+    }
+  },
+
   getHistory: async (req, res, next) => {
     try {
       const { idEmpresa, year, month } = req.params;
@@ -184,10 +201,10 @@ const statementsController = {
   rectify: async (req, res, next) => {
     try {
       const { employees, companyId, statementId, year, month } = req.body;
-      
+
       const cuils = new Set();
       for (const employee of employees) {
-        const cuil = String(employee.cuil).trim(); 
+        const cuil = String(employee.cuil).trim();
 
         if (cuils.has(cuil)) {
           console.log(`CUIL duplicado encontrado: ${cuil}`);
@@ -195,7 +212,7 @@ const statementsController = {
             res,
             null,
             400,
-            `Error: CUIL duplicado encontrado: ${cuil}` 
+            `Error: CUIL duplicado encontrado: ${cuil}`
           );
         }
         cuils.add(cuil);

@@ -14,6 +14,11 @@ router.get("/info/:idEmpresa/:idDeclaracion", statementsController.getInfo); // 
 
 router.get("/company/:idCompany", statementsController.getStatementsByCompany); // GET /statements/:idCompany
 
+router.get(
+  "/company/:idCompany/filtered",
+  statementsController.getStatementsByCompanyFiltered
+); // GET /statements/company/:idCompany/filtered
+
 router.get("/history/:idEmpresa/:year/:month", statementsController.getHistory); // GET /statements/history/:idEmpresa/:year/:month
 
 router.put("/:id/state", upload.any(), statementsController.changeState); // PUT /statements/:id/state
