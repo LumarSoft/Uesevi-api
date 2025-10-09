@@ -41,7 +41,12 @@ const newsController = {
   getLastThree: async (req, res) => {
     try {
       const latestNews = await newsModel.getLastThree(); // Asegúrate de que este método obtenga las últimas noticias correctamente
-      response(res, latestNews, 200, "Últimas tres noticias obtenidas con éxito");
+      response(
+        res,
+        latestNews,
+        200,
+        "Últimas tres noticias obtenidas con éxito"
+      );
     } catch (error) {
       handleError(res, error);
     }
@@ -72,10 +77,16 @@ const newsController = {
 
   addNew: async (req, res) => {
     try {
-      const { headline, epigraph, body, body2, addressee } = req.body;
+      let { headline, epigraph, body, body2, addressee } = req.body;
+
+      // Convertir la cadena "null" a null real para la base de datos
+      if (addressee === "null") {
+        addressee = null;
+      }
 
       // Validar que se proporcionen los campos obligatorios
-      if (!headline || !body || !addressee) {
+      // Nota: addressee puede ser null cuando es "todos", por eso no lo validamos aquí
+      if (!headline || !body) {
         const error = new Error("Faltan campos obligatorios");
         error.httpStatus = 400;
         throw error;
@@ -105,8 +116,14 @@ const newsController = {
 
   updateNew: async (req, res) => {
     try {
-      const { headline, epigraph, body, body2, addressee, existingImages } = req.body;
+      let { headline, epigraph, body, body2, addressee, existingImages } =
+        req.body;
       const newId = req.params.id;
+
+      // Convertir la cadena "null" a null real para la base de datos
+      if (addressee === "null") {
+        addressee = null;
+      }
 
       // Procesa las imágenes nuevas
       const newImages = req.files["images"]
@@ -114,15 +131,18 @@ const newsController = {
         : [];
 
       // Obtén las imágenes existentes que se quieren conservar
-      const existingImagesIds = existingImages ? 
-        (Array.isArray(existingImages) ? existingImages : [existingImages]) : [];
+      const existingImagesIds = existingImages
+        ? Array.isArray(existingImages)
+          ? existingImages
+          : [existingImages]
+        : [];
 
       // Obtén la noticia actual para buscar las imágenes existentes
       const existingNew = await newsModel.getById(newId);
       const existingImagesData = existingNew.images || [];
 
       // Filtra solo las imágenes existentes que se quieren conservar
-      const imagesToKeep = existingImagesData.filter(img => 
+      const imagesToKeep = existingImagesData.filter((img) =>
         existingImagesIds.includes(img.id.toString())
       );
 
@@ -132,7 +152,7 @@ const newsController = {
       // Procesa el PDF
       const pdf = req.files["pdf"]
         ? req.files["pdf"][0].filename
-        : (req.body.existingPdf || existingNew.archivo);
+        : req.body.existingPdf || existingNew.archivo;
 
       const result = await newsModel.updateNew({
         id: newId,

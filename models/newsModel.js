@@ -17,7 +17,7 @@ const noticiasModel = {
       created: formatDate(result.created),
       modified: formatDate(result.modified),
       cuerpo: formatedHTML(result.cuerpo),
-      cover_image: result.cover_image || null
+      cover_image: result.cover_image || null,
     }));
   },
 
@@ -37,7 +37,7 @@ const noticiasModel = {
       created: formatDate(result.created),
       modified: formatDate(result.modified),
       cuerpo: formatedHTML(result.cuerpo),
-      cover_image: result.cover_image || null
+      cover_image: result.cover_image || null,
     }));
   },
 
@@ -78,7 +78,7 @@ const noticiasModel = {
         modified: formatDate(result.modified),
         cuerpo: formatedHTML(result.cuerpo),
         cover_image: result.cover_image || null,
-        images: result.images ? result.images.split(',') : []
+        images: result.images ? result.images.split(",") : [],
       })),
       totalPages,
     };
@@ -90,7 +90,8 @@ const noticiasModel = {
     const [results] = await pool.query(query, [id]);
 
     //Luego traer todas las imagenes asociadas a esa noticia ordenadas por ID (primera = portada)
-    const queryImages = "SELECT * FROM imagenes_noticias WHERE noticia_id = ? ORDER BY id ASC";
+    const queryImages =
+      "SELECT * FROM imagenes_noticias WHERE noticia_id = ? ORDER BY id ASC";
 
     const [resultsImages] = await pool.query(queryImages, [id]);
 
@@ -101,7 +102,7 @@ const noticiasModel = {
       modified: formatDate(results[0].modified),
       cuerpo: formatedHTML(results[0].cuerpo),
       images: resultsImages,
-      cover_image: resultsImages.length > 0 ? resultsImages[0].nombre : null
+      cover_image: resultsImages.length > 0 ? resultsImages[0].nombre : null,
     };
   },
 
@@ -161,7 +162,8 @@ const noticiasModel = {
 
     // Actualización de la noticia
 
-    if (!headline || !body || !addressee) {
+    // Validar campos obligatorios (addressee puede ser null cuando es "todos")
+    if (!headline || !body) {
       const error = new Error("Faltan campos obligatorios");
       error.httpStatus = 400;
       throw error;
@@ -187,7 +189,7 @@ const noticiasModel = {
     // Inserción de imágenes (nuevas y existentes que se conservan)
     const queryInsertImagesNew =
       "INSERT INTO imagenes_noticias (id, noticia_id, nombre, created, modified) VALUES (?, ?, ?, NOW(), NOW())";
-    
+
     const queryInsertImagesExisting =
       "INSERT INTO imagenes_noticias (id, noticia_id, nombre, created, modified) VALUES (?, ?, ?, ?, NOW())";
 
@@ -197,11 +199,7 @@ const noticiasModel = {
     for (const image of images) {
       if (typeof image === "string") {
         // Es una imagen nueva (solo nombre de archivo)
-        await pool.query(queryInsertImagesNew, [
-          currentImageId,
-          id,
-          image,
-        ]);
+        await pool.query(queryInsertImagesNew, [currentImageId, id, image]);
         currentImageId++;
       } else if (typeof image === "object" && image.nombre) {
         // Es una imagen existente que se conserva (preservar fecha de creación original)
