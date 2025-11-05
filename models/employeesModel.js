@@ -356,60 +356,76 @@ WHERE
 
         query = `
           SELECT 
-            u.id,
-            u.apellido,
-            u.nombre,
-            CONCAT(u.apellido, ', ', u.nombre) AS nombre_completo,
-            u.email,
-            u.telefono,
-            u.estado,
-            e.id AS empleado_id,
+            MAX(u.id) as id,
+            MAX(u.apellido) as apellido,
+            MAX(u.nombre) as nombre,
+            CONCAT(MAX(u.apellido), ', ', MAX(u.nombre)) AS nombre_completo,
+            MAX(u.email) as email,
+            MAX(u.telefono) as telefono,
+            MAX(u.estado) as estado,
+            MAX(e.id) AS empleado_id,
             e.cuil, 
-            e.domicilio,
-            e.categoria_id,
-            c.created,
-            c.empresa_id,
-            em.nombre AS nombre_empresa,
-            e.sindicato_activo
+            MAX(e.domicilio) as domicilio,
+            MAX(e.categoria_id) as categoria_id,
+            MAX(COALESCE(c.created, s_c.created)) as created,
+            MAX(COALESCE(c.empresa_id, s_c.empresa_id)) as empresa_id,
+            MAX(COALESCE(em.nombre, s_em.nombre)) AS nombre_empresa,
+            MAX(e.sindicato_activo) as sindicato_activo
           FROM 
             usuarios u
           INNER JOIN 
             empleados e ON u.id = e.usuario_id
-          INNER JOIN 
-            contratos c ON e.id = c.empleado_id AND c.estado = '1' AND c.deleted IS NULL
-          INNER JOIN 
+          LEFT JOIN 
+            contratos c ON e.id = c.empleado_id AND c.deleted IS NULL
+          LEFT JOIN 
             empresas em ON c.empresa_id = em.id
+          LEFT JOIN 
+            sueldos s ON e.id = (SELECT empleado_id FROM contratos WHERE id = s.contrato_id)
+          LEFT JOIN 
+            contratos s_c ON s.contrato_id = s_c.id
+          LEFT JOIN 
+            empresas s_em ON s_c.empresa_id = s_em.id
           WHERE 
             u.rol = 'empleado'
-            AND u.deleted IS NULL
+            AND (c.id IS NOT NULL OR s.id IS NOT NULL)
             AND (
               u.apellido LIKE ? OR
               u.nombre LIKE ? OR
               e.cuil = ? OR
               e.cuil LIKE ? OR
-              em.nombre LIKE ?
+              COALESCE(em.nombre, s_em.nombre) LIKE ?
             )
+          GROUP BY 
+            e.cuil
+          ORDER BY 
+            MAX(COALESCE(c.created, s_c.created)) DESC
         `;
 
         countQuery = `
-          SELECT COUNT(u.id) as total
+          SELECT COUNT(DISTINCT e.cuil) as total
           FROM 
             usuarios u
           INNER JOIN 
             empleados e ON u.id = e.usuario_id
-          INNER JOIN 
-            contratos c ON e.id = c.empleado_id AND c.estado = '1' AND c.deleted IS NULL
-          INNER JOIN 
+          LEFT JOIN 
+            contratos c ON e.id = c.empleado_id AND c.deleted IS NULL
+          LEFT JOIN 
             empresas em ON c.empresa_id = em.id
+          LEFT JOIN 
+            sueldos s ON e.id = (SELECT empleado_id FROM contratos WHERE id = s.contrato_id)
+          LEFT JOIN 
+            contratos s_c ON s.contrato_id = s_c.id
+          LEFT JOIN 
+            empresas s_em ON s_c.empresa_id = s_em.id
           WHERE 
             u.rol = 'empleado'
-            AND u.deleted IS NULL
+            AND (c.id IS NOT NULL OR s.id IS NOT NULL)
             AND (
               u.apellido LIKE ? OR
               u.nombre LIKE ? OR
               e.cuil = ? OR
               e.cuil LIKE ? OR
-              em.nombre LIKE ?
+              COALESCE(em.nombre, s_em.nombre) LIKE ?
             )
         `;
 
@@ -430,55 +446,71 @@ WHERE
             () => `(
           u.apellido LIKE ? OR 
           u.nombre LIKE ? OR 
-          em.nombre LIKE ?
+          COALESCE(em.nombre, s_em.nombre) LIKE ?
         )`
           )
           .join(" AND ");
 
         query = `
           SELECT 
-            u.id,
-            u.apellido,
-            u.nombre,
-            CONCAT(u.apellido, ', ', u.nombre) AS nombre_completo,
-            u.email,
-            u.telefono,
-            u.estado,
-            e.id AS empleado_id,
+            MAX(u.id) as id,
+            MAX(u.apellido) as apellido,
+            MAX(u.nombre) as nombre,
+            CONCAT(MAX(u.apellido), ', ', MAX(u.nombre)) AS nombre_completo,
+            MAX(u.email) as email,
+            MAX(u.telefono) as telefono,
+            MAX(u.estado) as estado,
+            MAX(e.id) AS empleado_id,
             e.cuil, 
-            e.domicilio,
-            e.categoria_id,
-            c.created,
-            c.empresa_id,
-            em.nombre AS nombre_empresa,
-            e.sindicato_activo
+            MAX(e.domicilio) as domicilio,
+            MAX(e.categoria_id) as categoria_id,
+            MAX(COALESCE(c.created, s_c.created)) as created,
+            MAX(COALESCE(c.empresa_id, s_c.empresa_id)) as empresa_id,
+            MAX(COALESCE(em.nombre, s_em.nombre)) AS nombre_empresa,
+            MAX(e.sindicato_activo) as sindicato_activo
           FROM 
             usuarios u
           INNER JOIN 
             empleados e ON u.id = e.usuario_id
-          INNER JOIN 
-            contratos c ON e.id = c.empleado_id AND c.estado = '1' AND c.deleted IS NULL
-          INNER JOIN 
+          LEFT JOIN 
+            contratos c ON e.id = c.empleado_id AND c.deleted IS NULL
+          LEFT JOIN 
             empresas em ON c.empresa_id = em.id
+          LEFT JOIN 
+            sueldos s ON e.id = (SELECT empleado_id FROM contratos WHERE id = s.contrato_id)
+          LEFT JOIN 
+            contratos s_c ON s.contrato_id = s_c.id
+          LEFT JOIN 
+            empresas s_em ON s_c.empresa_id = s_em.id
           WHERE 
             u.rol = 'empleado'
-            AND u.deleted IS NULL
+            AND (c.id IS NOT NULL OR s.id IS NOT NULL)
             AND (${wordConditions})
+          GROUP BY 
+            e.cuil
+          ORDER BY 
+            MAX(COALESCE(c.created, s_c.created)) DESC
         `;
 
         countQuery = `
-          SELECT COUNT(u.id) as total
+          SELECT COUNT(DISTINCT e.cuil) as total
           FROM 
             usuarios u
           INNER JOIN 
             empleados e ON u.id = e.usuario_id
-          INNER JOIN 
-            contratos c ON e.id = c.empleado_id AND c.estado = '1' AND c.deleted IS NULL
-          INNER JOIN 
+          LEFT JOIN 
+            contratos c ON e.id = c.empleado_id AND c.deleted IS NULL
+          LEFT JOIN 
             empresas em ON c.empresa_id = em.id
+          LEFT JOIN 
+            sueldos s ON e.id = (SELECT empleado_id FROM contratos WHERE id = s.contrato_id)
+          LEFT JOIN 
+            contratos s_c ON s.contrato_id = s_c.id
+          LEFT JOIN 
+            empresas s_em ON s_c.empresa_id = s_em.id
           WHERE 
             u.rol = 'empleado'
-            AND u.deleted IS NULL
+            AND (c.id IS NOT NULL OR s.id IS NOT NULL)
             AND (${wordConditions})
         `;
 
@@ -488,7 +520,7 @@ WHERE
           queryParams.push(
             containsPattern, // u.apellido LIKE ?
             containsPattern, // u.nombre LIKE ?
-            containsPattern // em.nombre LIKE ?
+            containsPattern // COALESCE(em.nombre, s_em.nombre) LIKE ?
           );
         });
       }
@@ -500,9 +532,8 @@ WHERE
         queryParams.push(companyId);
       }
 
-      // Agregar ordenamiento y paginación (simplificado)
+      // Agregar paginación
       query += ` 
-        ORDER BY u.apellido ASC, u.nombre ASC
         LIMIT ? OFFSET ?
       `;
       queryParams.push(limit, offset);
