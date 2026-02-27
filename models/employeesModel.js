@@ -167,6 +167,16 @@ WHERE
       empleadoId
     );
 
+    // Obtener todos los IDs de empleado que comparten el mismo CUIL
+    const idsQuery = `SELECT id FROM empleados WHERE cuil = (SELECT cuil FROM empleados WHERE id = ?)`;
+    const [idsResults] = await pool.query(idsQuery, [empleadoId]);
+    
+    if (idsResults.length === 0) {
+      return [];
+    }
+    
+    const empleadoIds = idsResults.map(r => r.id);
+
     const query = `
     SELECT 
       c.id as contrato_id,
@@ -198,15 +208,15 @@ WHERE
     LEFT JOIN 
       categorias cat ON e.categoria_id = cat.id
     WHERE 
-      e.id = ?
+      e.id IN (?)
     ORDER BY 
       c.created DESC, c.modified DESC
     `;
 
     console.log("📝 Query SQL:", query);
-    console.log("🎯 Parámetros:", [empleadoId]);
+    console.log("🎯 Parámetros:", [empleadoIds]);
 
-    const [results] = await pool.query(query, [empleadoId]);
+    const [results] = await pool.query(query, [empleadoIds]);
     console.log("📊 Resultados de la consulta:", results.length, "registros");
 
     if (results.length > 0) {
@@ -368,8 +378,8 @@ WHERE
             MAX(e.domicilio) as domicilio,
             MAX(e.categoria_id) as categoria_id,
             MAX(COALESCE(c.created, s_c.created)) as created,
-            MAX(COALESCE(c.empresa_id, s_c.empresa_id)) as empresa_id,
-            MAX(COALESCE(em.nombre, s_em.nombre)) AS nombre_empresa,
+            SUBSTRING_INDEX(GROUP_CONCAT(COALESCE(c.empresa_id, s_c.empresa_id) ORDER BY COALESCE(c.created, s_c.created) DESC), ',', 1) as empresa_id,
+            SUBSTRING_INDEX(GROUP_CONCAT(COALESCE(em.nombre, s_em.nombre) ORDER BY COALESCE(c.created, s_c.created) DESC SEPARATOR '|||'), '|||', 1) AS nombre_empresa,
             MAX(e.sindicato_activo) as sindicato_activo
           FROM 
             usuarios u
@@ -465,8 +475,8 @@ WHERE
             MAX(e.domicilio) as domicilio,
             MAX(e.categoria_id) as categoria_id,
             MAX(COALESCE(c.created, s_c.created)) as created,
-            MAX(COALESCE(c.empresa_id, s_c.empresa_id)) as empresa_id,
-            MAX(COALESCE(em.nombre, s_em.nombre)) AS nombre_empresa,
+            SUBSTRING_INDEX(GROUP_CONCAT(COALESCE(c.empresa_id, s_c.empresa_id) ORDER BY COALESCE(c.created, s_c.created) DESC), ',', 1) as empresa_id,
+            SUBSTRING_INDEX(GROUP_CONCAT(COALESCE(em.nombre, s_em.nombre) ORDER BY COALESCE(c.created, s_c.created) DESC SEPARATOR '|||'), '|||', 1) AS nombre_empresa,
             MAX(e.sindicato_activo) as sindicato_activo
           FROM 
             usuarios u
@@ -753,6 +763,10 @@ WHERE
               employee.apellido,
               result.usuario_id,
             ]);
+
+            // Desactivar contratos anteriores del empleado en otras empresas para que solo tenga uno activo
+            const queryDeactivateOtherContracts = `UPDATE contratos SET deleted = NOW() WHERE empleado_id = ? AND deleted IS NULL`;
+            await connection.query(queryDeactivateOtherContracts, [result.id]);
 
             // Crear un nuevo contrato asociando al empleado con la empresa
             const queryLastIdContract = `SELECT MAX(id) as lastId FROM contratos`;
