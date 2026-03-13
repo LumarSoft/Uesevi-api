@@ -669,13 +669,18 @@ WHERE
     await connection.beginTransaction();
 
     try {
-      // Hacemos una query para poner el campo deleted a todos los empleados que estén en la empresa en este momento
+      // Si no hay empleados para importar, no tocamos contratos ni creamos DJ
+      if (!employees || employees.length === 0) {
+        console.log(
+          "importEmployees: no se recibieron empleados, se mantienen contratos existentes y no se crea declaración."
+        );
+        await connection.commit();
+        return { status: "NO_EMPLOYEES" };
+      }
+
+      // Hacemos una query para poner el campo deleted a todos los contratos de esa empresa en este momento
       const queryDeleteEmployees = `UPDATE contratos SET deleted = NOW() WHERE empresa_id = ?;`;
       await connection.query(queryDeleteEmployees, [companyId]);
-
-      // También lo hacemos en la tabla usuarios
-      const queryDeleteUsers = `UPDATE usuarios SET deleted = NOW() WHERE id IN (SELECT usuario_id FROM empleados WHERE id IN (SELECT empleado_id FROM contratos WHERE empresa_id = ?));`;
-      await connection.query(queryDeleteUsers, [companyId]);
 
       let amount = 0;
       // Recorremos cada empleado dentro del array de employees
