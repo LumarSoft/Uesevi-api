@@ -305,8 +305,8 @@ WHERE
         return { status: "NO_EMPLOYEES" };
       }
 
-      // Hacemos una query para poner el campo deleted a todos los contratos de esa empresa en este momento
-      const queryDeleteEmployees = `UPDATE contratos SET deleted = NOW() WHERE empresa_id = ?;`;
+      // Hacemos una query para poner el campo deleted a todos los contratos activos de esa empresa en este momento
+      const queryDeleteEmployees = `UPDATE contratos SET deleted = NOW() WHERE empresa_id = ? AND deleted IS NULL;`;
       await connection.query(queryDeleteEmployees, [companyId]);
 
       let amount = 0;
