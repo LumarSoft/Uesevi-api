@@ -704,7 +704,7 @@ WHERE
             const lastIdUser = resultsLastId[0].lastId;
 
             // Insertamos el usuario
-            const queryInsertUser = `INSERT INTO usuarios (id, nombre, apellido, rol, estado, created, modified) VALUES (?, ?, ?, ?, ?, NOW(), NOW());`;
+            const queryInsertUser = `INSERT INTO usuarios (id, nombre, apellido, rol, estado, email, password, created, modified) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW());`;
 
             await connection.query(queryInsertUser, [
               lastIdUser + 1,
@@ -712,6 +712,8 @@ WHERE
               employee.apellido,
               "empleado",
               1,
+              "",
+              "",
             ]);
 
             // Buscamos el ultimo id de la tabla empleados
@@ -905,6 +907,9 @@ WHERE
           const [resultsCategoryId] = await connection.query(queryCategoryId, [
             employee.categora,
           ]);
+          if (!resultsCategoryId || resultsCategoryId.length === 0) {
+            throw new Error(`Categoría no encontrada: "${employee.categora}" (empleado: ${employee.nombre})`);
+          }
           const categoryId = resultsCategoryId[0].id;
           const categorySueldoBasico = resultsCategoryId[0].sueldo_basico;
 
@@ -952,10 +957,8 @@ WHERE
             );
             sindicalTotal += aportes;
           } else {
-            // Si no es adherente: 2% del sueldo básico
-            aportes =
-              (sueldoBasico + sumaNoRemunerativa + remunerativoAdicional) *
-              0.02;
+            // Si no es adherente: 2% del sueldo_basico de la categoría (fijo por categoría)
+            aportes = Number(categorySueldoBasico) * 0.02;
             console.log(
               "Aportes solidarios de ",
               employee.nombre,

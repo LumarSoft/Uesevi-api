@@ -91,7 +91,7 @@ const companiesModel = {
 
       console.log(LastIdUsuario);
 
-      const queryUsuario = `INSERT INTO usuarios (id,email, password, nombre, apellido, telefono, rol, created, modified) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`;
+      const queryUsuario = `INSERT INTO usuarios (id, email, password, nombre, apellido, telefono, rol, estado, created, modified) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`;
       const [resultUsuario] = await connection.query(queryUsuario, [
         LastIdUsuario + 1,
         username,
@@ -100,6 +100,7 @@ const companiesModel = {
         contactLastName,
         contactPhone,
         "empresa",
+        "activo",
       ]);
 
       const queryLastIdEmpresa = `SELECT id FROM empresas ORDER BY id DESC LIMIT 1`;

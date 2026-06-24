@@ -501,6 +501,9 @@ WHERE
           const [resultsCategoryId] = await connection.query(queryCategoryId, [
             employee.categora,
           ]);
+          if (!resultsCategoryId || resultsCategoryId.length === 0) {
+            throw new Error(`Categoría no encontrada: "${employee.categora}" (empleado: ${employee.nombre})`);
+          }
           const categoryId = resultsCategoryId[0].id;
           const categorySueldoBasico = resultsCategoryId[0].sueldo_basico;
 
@@ -537,8 +540,8 @@ WHERE
             aportes = (sueldoBasico + adicionales + sumaNoRemunerativa + remunerativoAdicional) * 0.03;
             sindicalTotal += aportes;
           } else {
-            // Si no es adherente: 2% del sueldo básico
-            aportes = (sueldoBasico + sumaNoRemunerativa + remunerativoAdicional) * 0.02;
+            // Si no es adherente: 2% del sueldo_basico de la categoría (fijo por categoría)
+            aportes = Number(categorySueldoBasico) * 0.02;
 
             solidarioTotal += aportes;
           }
