@@ -501,6 +501,11 @@ WHERE
           const [resultsCategoryId] = await connection.query(queryCategoryId, [
             employee.categora,
           ]);
+          if (!resultsCategoryId || resultsCategoryId.length === 0) {
+            throw new Error(
+              `Categoría inexistente: "${employee.categora}" (empleado ${employee.nombre} ${employee.apellido}, CUIL ${employee.cuil}). Verificá que la categoría exista en el sistema.`
+            );
+          }
           const categoryId = resultsCategoryId[0].id;
           const categorySueldoBasico = resultsCategoryId[0].sueldo_basico;
 
@@ -537,8 +542,11 @@ WHERE
             aportes = (sueldoBasico + adicionales + sumaNoRemunerativa + remunerativoAdicional) * 0.03;
             sindicalTotal += aportes;
           } else {
-            // Si no es adherente: 2% del sueldo básico
-            aportes = (sueldoBasico + sumaNoRemunerativa + remunerativoAdicional) * 0.02;
+            // Aporte solidario (no afiliados): 2% FIJO del sueldo básico de la
+            // CATEGORÍA tomado del sistema (tabla categorias). Ya no depende del
+            // sueldo real del empleado ni de adicionales/sumas no remunerativas.
+            // Si categorySueldoBasico es null/0 el aporte da 0 (revisar categoría).
+            aportes = Number(categorySueldoBasico) * 0.02;
 
             solidarioTotal += aportes;
           }
