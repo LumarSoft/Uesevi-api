@@ -25,6 +25,7 @@ import oldCompaniesRouter from "./routes/oldCompaniesRoute.js";
 import inquiriesRouter from "./routes/inquiriesRoute.js";
 import newsRouter from "./routes/newsRoute.js";
 import basicSalaryRouter from "./routes/basicSalaryRoute.js";
+import paymentsPanelRouter from "./routes/paymentsPanelRoute.js";
 
 const app = express();
 const startingPort = process.env.PORT || 3010; // Usar variable de entorno para el puerto
@@ -106,6 +107,7 @@ const setupRoutes = () => {
   app.use("/old-companies", oldCompaniesRouter);
   app.use("/inquiries", inquiriesRouter);
   app.use("/basicSalary", basicSalaryRouter);
+  app.use("/payments-panel", paymentsPanelRouter);
   app.get("/health", (req, res) => {
     res.status(200).send("OK");
   });
