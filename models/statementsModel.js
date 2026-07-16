@@ -44,11 +44,20 @@ ORDER BY
   },
 
   getInfo: async (idEmpresa, idDeclaracion) => {
-    const query = `SELECT 
+    // Los contadores salen de los sueldos de ESTA declaración (snapshot), no de
+    // los contratos activos hoy: una DDJJ histórica/rectificada no debe cambiar
+    // porque la nómina actual cambió. El desglose (FAS/Solidario/Sindical) sale
+    // de la tabla auxiliar, la misma fuente que usa el Panel de Pagos.
+    const query = `SELECT
     d.id,
     e.nombre AS nombre_empresa,
-    COUNT(DISTINCT emp.id) AS cantidad_empleados_declaracion,
-    COUNT(DISTINCT CASE WHEN emp.sindicato_activo = 1 THEN emp.id END) AS cantidad_afiliados_declaracion,
+    (SELECT COUNT(*) FROM sueldos s WHERE s.declaraciones_jurada_id = d.id) AS cantidad_empleados_declaracion,
+    (SELECT COUNT(*)
+       FROM sueldos s
+       INNER JOIN contratos c2 ON s.contrato_id = c2.id
+       INNER JOIN empleados emp2 ON c2.empleado_id = emp2.id
+      WHERE s.declaraciones_jurada_id = d.id
+        AND COALESCE(s.sindicato_activo, emp2.sindicato_activo) = 1) AS cantidad_afiliados_declaracion,
     d.year,
     d.mes,
     d.rectificada,
@@ -58,25 +67,24 @@ ORDER BY
     d.subtotal,
     d.sueldo_basico,
     d.estado,
-    d.ajuste
-FROM 
-    contratos c
-INNER JOIN 
-    empleados emp ON c.empleado_id = emp.id
-INNER JOIN 
-    usuarios u ON emp.usuario_id = u.id
-INNER JOIN 
-    empresas e ON c.empresa_id = e.id
-INNER JOIN 
-    declaraciones_juradas d ON d.id = ?
-WHERE 
-    c.empresa_id = ?
-    AND c.deleted IS NULL`;
-    const [result] = await pool.query(query, [idDeclaracion, idEmpresa]);
+    d.ajuste,
+    a.fas AS desglose_fas,
+    a.solidario AS desglose_solidario,
+    a.sindical AS desglose_sindical,
+    a.total AS desglose_total
+FROM
+    declaraciones_juradas d
+INNER JOIN
+    empresas e ON e.id = ?
+LEFT JOIN
+    auxiliar a ON a.id_declaracion = d.id
+WHERE
+    d.id = ?`;
+    const [result] = await pool.query(query, [idEmpresa, idDeclaracion]);
 
-    const query2 = `SELECT 
-    CONCAT(u.apellido, ' ', u.nombre) AS nombre_completo, 
-    CASE WHEN emp.sindicato_activo = 1 THEN 'Sí' ELSE 'No' END AS afiliado,
+    const query2 = `SELECT
+    CONCAT(u.apellido, ' ', u.nombre) AS nombre_completo,
+    CASE WHEN COALESCE(s.sindicato_activo, emp.sindicato_activo) = 1 THEN 'Sí' ELSE 'No' END AS afiliado,
     emp.cuil,
     s.sueldo_basico,
     s.monto,
@@ -100,9 +108,9 @@ INNER JOIN
 WHERE 
     d.id = ?
     AND c.empresa_id = ?
-    ORDER BY 
-    emp.sindicato_activo DESC,  
-    u.apellido ASC;       
+    ORDER BY
+    COALESCE(s.sindicato_activo, emp.sindicato_activo) DESC,
+    u.apellido ASC;
 
 `;
 
