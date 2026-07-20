@@ -188,6 +188,12 @@ const employeesController = {
         month,
         year
       );
+
+      // La declaración ya existía para ese período (anti doble submit).
+      if (result?.status === "DUPLICATE") {
+        return handleError(res, null, 409, result.message);
+      }
+
       response(res, result, 201, "Empleados importados con éxito");
     } catch (error) {
       handleError(res, error);
