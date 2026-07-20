@@ -108,7 +108,25 @@ WHERE
 
     const [result2] = await pool.query(query2, [idDeclaracion, idEmpresa]);
 
-    return { ...result[0], empleados: result2 };
+    // Desglose CONGELADO (snapshot) por concepto, tomado de la tabla auxiliar
+    // al momento en que se cargó/rectificó la declaración. Es la fuente de
+    // verdad del desglose FAS / Solidario / Sindical: NO se recalcula en vivo,
+    // así los valores no cambian aunque cambien los básicos de categoría o la
+    // fórmula. Si la declaración es legacy y no tiene fila en auxiliar, queda
+    // null y el front cae al cálculo tradicional. Es el mismo dato que consume
+    // el Panel de Pagos, por eso Panel y DDJJ coinciden.
+    const queryAux = `SELECT fas, solidario, sindical, total FROM auxiliar WHERE id_declaracion = ? ORDER BY id DESC LIMIT 1`;
+    const [auxRows] = await pool.query(queryAux, [idDeclaracion]);
+    const desglose = auxRows.length
+      ? {
+          fas: Number(auxRows[0].fas) || 0,
+          solidario: Number(auxRows[0].solidario) || 0,
+          sindical: Number(auxRows[0].sindical) || 0,
+          total: Number(auxRows[0].total) || 0,
+        }
+      : null;
+
+    return { ...result[0], empleados: result2, desglose };
   },
 
   getStatementsByCompany: async (idCompany) => {

@@ -678,6 +678,29 @@ WHERE
         return { status: "NO_EMPLOYEES" };
       }
 
+      // GUARD anti-duplicado: si ya existe una declaración ORIGINAL (rectificada=0)
+      // para este período no creamos otra. Evita que un doble submit / doble click
+      // genere dos DDJJ del mismo mes. Para corregir una declaración existente se
+      // usa el flujo de Rectificar (que crea rectificada+1, no pasa por acá).
+      const [dupe] = await connection.query(
+        `SELECT id FROM declaraciones_juradas
+         WHERE empresa_id = ? AND mes = ? AND year = ? AND rectificada = 0
+         LIMIT 1`,
+        [companyId, month, year]
+      );
+      if (dupe.length) {
+        await connection.rollback();
+        console.log(
+          `importEmployees: declaración duplicada bloqueada para empresa ${companyId}, período ${month}/${year} (ya existe id ${dupe[0].id}).`
+        );
+        return {
+          status: "DUPLICATE",
+          declaracionId: dupe[0].id,
+          message:
+            "Ya existe una declaración jurada para este período. Si necesitás corregirla, usá la opción Rectificar.",
+        };
+      }
+
       // Hacemos una query para poner el campo deleted a todos los contratos activos de esa empresa en este momento
       const queryDeleteEmployees = `UPDATE contratos SET deleted = NOW() WHERE empresa_id = ? AND deleted IS NULL;`;
       await connection.query(queryDeleteEmployees, [companyId]);

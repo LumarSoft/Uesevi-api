@@ -179,35 +179,56 @@ const paymentsPanelModel = {
   },
 
   // GET /payments-panel/summary — tarjetas de resumen (doble total + desglose).
+  //
+  // MES VENCIDO: los aportes se cobran a mes vencido. Parado en un mes, lo que se
+  // cobra corresponde al PERÍODO del mes anterior (ej.: en julio se cobra junio).
+  // Por eso "Cobrado del mes" y "Empresas pendientes" se calculan sobre el
+  // período = month - 1 (con roll-over de enero -> diciembre del año anterior).
+  // "Acumulado del año" sigue siendo todo lo cobrado del año en curso.
   getSummary: async ({ year, month }) => {
-    const [rows] = await pool.query(VIGENTES_QUERY, [year, year]);
+    // Período cobrado (mes vencido).
+    const periodoMes = month === 1 ? 12 : month - 1;
+    const periodoYear = month === 1 ? year - 1 : year;
+
+    // Filas del año en curso (acumulado anual).
+    const [rowsAnio] = await pool.query(VIGENTES_QUERY, [year, year]);
+    // Filas del año del período cobrado (puede ser el año anterior si month=enero).
+    const [rowsPeriodo] =
+      periodoYear === year
+        ? [rowsAnio]
+        : await pool.query(VIGENTES_QUERY, [periodoYear, periodoYear]);
 
     const empty = () => ({ fas: 0, solidario: 0, sindical: 0, total: 0 });
     const cobrado_mes = empty();
     const acumulado_anio = empty();
 
-    // Empresas pendientes en el mes seleccionado.
     const [companies] = await pool.query(
       `SELECT COUNT(*) AS total FROM empresas WHERE estado <> 'Inactivo'`
     );
     const totalEmpresas = num(companies[0]?.total);
     const empresasPendientesMes = new Set();
 
-    for (const raw of rows) {
+    // Acumulado anual: todo lo pagado del año en curso (cualquier período).
+    for (const raw of rowsAnio) {
       const r = resolveRow(raw);
       if (r.estado === "Pagado") {
         acumulado_anio.fas += r.fas;
         acumulado_anio.solidario += r.solidario;
         acumulado_anio.sindical += r.sindical;
         acumulado_anio.total += r.total;
-        if (r.mes === month) {
-          cobrado_mes.fas += r.fas;
-          cobrado_mes.solidario += r.solidario;
-          cobrado_mes.sindical += r.sindical;
-          cobrado_mes.total += r.total;
-        }
       }
-      if (r.estado === "Pendiente" && r.mes === month) {
+    }
+
+    // Cobrado del mes + pendientes: sobre el período cobrado (mes vencido).
+    for (const raw of rowsPeriodo) {
+      const r = resolveRow(raw);
+      if (r.mes !== periodoMes) continue;
+      if (r.estado === "Pagado") {
+        cobrado_mes.fas += r.fas;
+        cobrado_mes.solidario += r.solidario;
+        cobrado_mes.sindical += r.sindical;
+        cobrado_mes.total += r.total;
+      } else if (r.estado === "Pendiente") {
         empresasPendientesMes.add(r.empresa_id);
       }
     }
@@ -226,6 +247,8 @@ const paymentsPanelModel = {
         pendientes: empresasPendientesMes.size,
         total: totalEmpresas,
       },
+      // Período efectivamente cobrado (para rotular las tarjetas en el front).
+      periodo: { mes: periodoMes, year: periodoYear },
     };
   },
 
