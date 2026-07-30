@@ -1,6 +1,7 @@
 import cron from "node-cron";
 import { pool } from "./db/db.js";
 import { transporter } from "./mailer.js";
+import categoryModel from "./models/categoryModel.js";
 
 // Función para obtener emails de empresas
 const getCompanyEmails = async () => {
@@ -84,13 +85,26 @@ cron.schedule("0 9 15 * *", async () => {
 // });
 
 // Mantener la función existente de actualización de salarios
+// Promueve los valores programados de las categorías cuya vigencia ya llegó:
+// sueldo_futuro -> sueldo_basico  y  presentismo_futuro -> presentismo.
+//
+// ⚠️ Delega en categoryModel.updateNow(). Antes esta función tenía su PROPIA
+// copia del UPDATE, que sólo contemplaba el sueldo: al agregar el presentismo
+// programado quedó desincronizada y el presentismo nunca se habría promovido.
+// Una sola implementación, en el modelo — no volver a duplicar el SQL acá.
 const checkAndUpdateSalaries = async () => {
-  const now = new Date();
-  const query =
-    "UPDATE categorias SET sueldo_basico = sueldo_futuro, sueldo_futuro = NULL, fecha_vigencia = NULL WHERE fecha_vigencia <= ? AND sueldo_futuro IS NOT NULL";
-
-  await pool.query(query, [now]);
+  try {
+    const r = await categoryModel.updateNow();
+    if (r.affectedRows > 0) {
+      console.log(
+        `Categorías actualizadas: ${r.sueldosActualizados} sueldo(s) básico(s), ` +
+          `${r.presentismosActualizados} presentismo(s).`
+      );
+    }
+  } catch (error) {
+    console.error("Error al promover valores programados de categorías:", error);
+  }
 };
 
-// Mantener el job de actualización de salarios
+// Job diario de actualización de sueldos básicos y presentismos programados.
 cron.schedule("0 0 * * *", checkAndUpdateSalaries);

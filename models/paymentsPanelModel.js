@@ -39,25 +39,55 @@ const VIGENTES_QUERY = `
     a.total          AS aux_total,
     pp.id            AS pp_id,
     pp.fecha_pago    AS pp_fecha_pago,
+    pp.aplica_interes AS pp_aplica_interes,
     pp.importe_fas   AS pp_fas,
     pp.importe_solidario AS pp_solidario,
     pp.importe_sindical  AS pp_sindical,
     pp.importe_intereses AS pp_intereses,
     pp.total         AS pp_total,
+    pp.observaciones AS pp_observaciones,
     pp.estado_pago   AS pp_estado
   FROM declaraciones_juradas dj
+  -- ⚠️ INVARIANTE: esta consulta devuelve EXACTAMENTE UNA FILA por
+  -- (empresa, mes, year). Los tres JOIN de abajo están escritos para no poder
+  -- multiplicar filas, porque las tres tablas pueden tener duplicados:
+  --   • declaraciones_juradas: falta el UNIQUE (empresa, mes, year, rectificada)
+  --     en producción, así que puede haber dos DDJJ con la misma rectificada.
+  --   • auxiliar: puede tener varias filas por declaración (por eso getInfo
+  --     usa ORDER BY id DESC LIMIT 1).
+  --   • pagos_panel: si el índice uq_pagos_panel_ddjj no está creado, el
+  --     ON DUPLICATE KEY del upsert no dispara y se acumulan filas.
+  -- Con LEFT JOIN "planos" cada duplicado se multiplicaba y el mismo mes
+  -- aparecía repetido en la grilla y en el detalle. No confiar en que los datos
+  -- estén limpios: la consulta tiene que ser inmune.
   INNER JOIN (
-    SELECT empresa_id, mes, year, MAX(rectificada) AS max_rect
-    FROM declaraciones_juradas
-    WHERE year = ?
-    GROUP BY empresa_id, mes, year
-  ) mx
-    ON mx.empresa_id = dj.empresa_id
-   AND mx.mes  = dj.mes
-   AND mx.year = dj.year
-   AND mx.max_rect = dj.rectificada
-  LEFT JOIN auxiliar a ON a.id_declaracion = dj.id
-  LEFT JOIN pagos_panel pp ON pp.declaracion_jurada_id = dj.id
+    -- Una sola declaración por período: la última rectificativa y, si hubiera
+    -- empate de rectificada (carga duplicada), la de id más alto.
+    SELECT MAX(d2.id) AS declaracion_id
+    FROM declaraciones_juradas d2
+    INNER JOIN (
+      SELECT empresa_id, mes, year, MAX(rectificada) AS max_rect
+      FROM declaraciones_juradas
+      WHERE year = ?
+      GROUP BY empresa_id, mes, year
+    ) mx
+      ON mx.empresa_id = d2.empresa_id
+     AND mx.mes  = d2.mes
+     AND mx.year = d2.year
+     AND mx.max_rect = d2.rectificada
+    GROUP BY d2.empresa_id, d2.mes, d2.year
+  ) vig ON vig.declaracion_id = dj.id
+  LEFT JOIN auxiliar a
+    ON a.id = (SELECT MAX(a2.id) FROM auxiliar a2 WHERE a2.id_declaracion = dj.id)
+  LEFT JOIN pagos_panel pp
+    ON pp.id = (
+      SELECT pp2.id FROM pagos_panel pp2
+      WHERE pp2.declaracion_jurada_id = dj.id
+      -- Mismo criterio que el upsert: gana el confirmado, y entre iguales el
+      -- más reciente.
+      ORDER BY pp2.estado_pago DESC, pp2.id DESC
+      LIMIT 1
+    )
   WHERE dj.year = ?
 `;
 
@@ -69,8 +99,21 @@ const resolveRow = (r) => {
     r.pp_solidario != null ? num(r.pp_solidario) : num(r.aux_solidario);
   const sindical =
     r.pp_sindical != null ? num(r.pp_sindical) : num(r.aux_sindical);
-  const intereses =
-    r.pp_intereses != null ? num(r.pp_intereses) : num(r.dj_interes);
+
+  // ¿Esta declaración lleva interés por mora? Se decide en el panel y se
+  // persiste, porque la grilla, el detalle y los totalizadores tienen que
+  // respetar la misma decisión. Sin fila en pagos_panel el default es 1
+  // (comportamiento histórico: la DDJJ trae su propio interés calculado).
+  const aplicaInteres = r.pp_id != null ? Number(r.pp_aplica_interes) === 1 : true;
+
+  // Con el interés desactivado el importe queda en 0 y NO se cae al interés de
+  // la DDJJ: justamente lo que se quiere evitar en las declaraciones viejas que
+  // se completan a mano y ya fueron pagadas.
+  const intereses = !aplicaInteres
+    ? 0
+    : r.pp_intereses != null
+    ? num(r.pp_intereses)
+    : num(r.dj_interes);
 
   // Total resuelto. Si no hay desglose (DDJJ legacy sin auxiliar), cae al importe.
   let total = round2(fas + solidario + sindical + intereses);
@@ -98,6 +141,9 @@ const resolveRow = (r) => {
     total,
     fecha_pago: fecha_pago || null,
     estado,
+    aplica_interes: aplicaInteres,
+    pagos_panel_id: r.pp_id ?? null,
+    observaciones: r.pp_observaciones ?? null,
   };
 };
 
@@ -143,6 +189,7 @@ const paymentsPanelModel = {
                 solidario: cell.solidario,
                 sindical: cell.sindical,
                 intereses: cell.intereses,
+                aplica_interes: cell.aplica_interes,
               }
             : {
                 mes: m,
@@ -154,6 +201,7 @@ const paymentsPanelModel = {
                 solidario: 0,
                 sindical: 0,
                 intereses: 0,
+                aplica_interes: true,
               }
         );
       }
@@ -282,6 +330,8 @@ const paymentsPanelModel = {
         fecha_pago: r.fecha_pago,
         estado: r.estado,
         declaracion_jurada_id: r.declaracion_jurada_id,
+        aplica_interes: r.aplica_interes,
+        pagos_panel_id: r.pagos_panel_id,
       });
       if (r.estado === "Pagado") {
         total_pagado_anio += r.total;
@@ -325,10 +375,18 @@ const paymentsPanelModel = {
         sindical: 0,
         subtotal: 0,
         estado: "Sin DDJJ",
+        fecha_pago: null,
+        intereses: 0,
+        aplica_interes: true,
+        observaciones: null,
+        pagos_panel_id: null,
       };
     }
 
     const r = resolveRow(rows[0]);
+    // Se devuelve el estado COMPLETO de lo ya cargado (fecha, intereses,
+    // observaciones), no sólo la propuesta: el diálogo lo usa para PRECARGAR y
+    // permitir corregir. Antes abría en blanco y se perdía lo cargado.
     return {
       declaracion_jurada_id: r.declaracion_jurada_id,
       fas: r.fas,
@@ -336,6 +394,15 @@ const paymentsPanelModel = {
       sindical: r.sindical,
       subtotal: num(rows[0].subtotal) || round2(r.fas + r.solidario + r.sindical),
       estado: r.estado,
+      fecha_pago: r.fecha_pago,
+      intereses: r.intereses,
+      // Default de negocio: una DDJJ ya pagada no recalcula interés; una
+      // pendiente sí. Sólo aplica cuando todavía no hay fila en pagos_panel;
+      // si ya la hay, manda lo guardado.
+      aplica_interes:
+        r.pagos_panel_id != null ? r.aplica_interes : r.estado !== "Pagado",
+      observaciones: r.observaciones,
+      pagos_panel_id: r.pagos_panel_id,
     };
   },
 
@@ -365,6 +432,7 @@ const paymentsPanelModel = {
     const {
       declaracion_jurada_id,
       fecha_pago,
+      aplica_interes,
       importe_fas,
       importe_solidario,
       importe_sindical,
@@ -379,39 +447,68 @@ const paymentsPanelModel = {
 
     // DDJJ vigente + desglose para resolver defaults.
     const [dj] = await pool.query(
+      // El JOIN va contra la ÚLTIMA fila de auxiliar (puede haber varias por
+      // declaración), igual que en VIGENTES_QUERY y en statementsModel.getInfo.
       `SELECT dj.empresa_id, dj.mes, dj.year, dj.subtotal, dj.importe,
               a.fas, a.solidario, a.sindical
        FROM declaraciones_juradas dj
-       LEFT JOIN auxiliar a ON a.id_declaracion = dj.id
+       LEFT JOIN auxiliar a
+         ON a.id = (SELECT MAX(a2.id) FROM auxiliar a2 WHERE a2.id_declaracion = dj.id)
        WHERE dj.id = ?`,
       [declaracion_jurada_id]
     );
     if (!dj.length) throw new Error("Declaración jurada no encontrada");
 
-    // No permitir editar un pago ya confirmado (solo lectura).
+    // Registro vigente del período, si ya existe. Un pago YA CONFIRMADO se
+    // puede seguir editando (hay que poder corregir una fecha mal cargada) y
+    // sigue confirmado: más abajo el UPDATE no toca `estado_pago`.
+    //
+    // ORDER BY: gana el confirmado y, entre iguales, el más reciente. Es el
+    // mismo criterio que usa VIGENTES_QUERY, y contempla que puedan existir
+    // filas duplicadas de antes de este fix.
     const [existing] = await pool.query(
-      `SELECT id, estado_pago FROM pagos_panel WHERE declaracion_jurada_id = ?`,
+      `SELECT id, estado_pago, aplica_interes FROM pagos_panel
+       WHERE declaracion_jurada_id = ?
+       ORDER BY estado_pago DESC, id DESC
+       LIMIT 1`,
       [declaracion_jurada_id]
     );
-    if (existing.length && Number(existing[0].estado_pago) === 1) {
-      throw new Error("El pago ya está confirmado y es de solo lectura");
-    }
 
-    // Intereses: autocalcular si no vienen y hay fecha de pago.
-    let intereses = importe_intereses;
-    if ((intereses === undefined || intereses === null || intereses === "") && fecha_pago) {
-      const [tasa] = await pool.query(`SELECT porcentaje FROM tasa LIMIT 1`);
-      const subtotal = num(dj[0].subtotal) || num(dj[0].importe);
-      const calc = calcInterest({
-        subtotal,
-        mes: dj[0].mes,
-        year: dj[0].year,
-        fechaPago: fecha_pago,
-        porcentaje: num(tasa[0]?.porcentaje),
-      });
-      intereses = calc.interes;
+    // ¿Aplica interés? Si el front no lo manda, se conserva lo que ya estaba;
+    // y si es un registro nuevo, el default es 1 (calcula), como venía siendo.
+    const aplicaInteres =
+      aplica_interes !== undefined && aplica_interes !== null
+        ? Number(aplica_interes) === 1
+        : existing.length
+        ? Number(existing[0].aplica_interes) === 1
+        : true;
+
+    // Intereses.
+    // Con aplicaInteres = false el interés es 0, punto: "no aplica interés"
+    // significa que la declaración no lleva interés, no sólo que no se
+    // recalcula. Es lo que hace falta para completar declaraciones viejas ya
+    // cobradas sin inflarles el importe.
+    let intereses = 0;
+    if (aplicaInteres) {
+      intereses = importe_intereses;
+      // Autocalcular si no vino importe explícito y hay fecha de pago.
+      if (
+        (intereses === undefined || intereses === null || intereses === "") &&
+        fecha_pago
+      ) {
+        const [tasa] = await pool.query(`SELECT porcentaje FROM tasa LIMIT 1`);
+        const subtotal = num(dj[0].subtotal) || num(dj[0].importe);
+        const calc = calcInterest({
+          subtotal,
+          mes: dj[0].mes,
+          year: dj[0].year,
+          fechaPago: fecha_pago,
+          porcentaje: num(tasa[0]?.porcentaje),
+        });
+        intereses = calc.interes;
+      }
+      intereses = num(intereses);
     }
-    intereses = num(intereses);
 
     // Valores resueltos (override o propuesta de la DDJJ) para cachear el total.
     const fas = importe_fas != null && importe_fas !== "" ? num(importe_fas) : num(dj[0].fas);
@@ -421,44 +518,89 @@ const paymentsPanelModel = {
       importe_sindical != null && importe_sindical !== "" ? num(importe_sindical) : num(dj[0].sindical);
     const total = round2(fas + solidario + sindical + intereses);
 
-    const params = [
-      declaracion_jurada_id,
-      dj[0].empresa_id,
-      dj[0].mes,
-      dj[0].year,
-      fecha_pago || null,
-      importe_fas != null && importe_fas !== "" ? num(importe_fas) : null,
-      importe_solidario != null && importe_solidario !== "" ? num(importe_solidario) : null,
-      importe_sindical != null && importe_sindical !== "" ? num(importe_sindical) : null,
-      intereses,
-      total,
-      observaciones || null,
-      usuario_carga || null,
-    ];
+    const ovFas =
+      importe_fas != null && importe_fas !== "" ? num(importe_fas) : null;
+    const ovSolidario =
+      importe_solidario != null && importe_solidario !== ""
+        ? num(importe_solidario)
+        : null;
+    const ovSindical =
+      importe_sindical != null && importe_sindical !== ""
+        ? num(importe_sindical)
+        : null;
 
-    const query = `
-      INSERT INTO pagos_panel
-        (declaracion_jurada_id, empresa_id, mes, year, fecha_pago,
-         importe_fas, importe_solidario, importe_sindical, importe_intereses,
-         total, observaciones, usuario_carga, created, modified)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
-      ON DUPLICATE KEY UPDATE
-        fecha_pago = VALUES(fecha_pago),
-        importe_fas = VALUES(importe_fas),
-        importe_solidario = VALUES(importe_solidario),
-        importe_sindical = VALUES(importe_sindical),
-        importe_intereses = VALUES(importe_intereses),
-        total = VALUES(total),
-        observaciones = VALUES(observaciones),
-        usuario_carga = VALUES(usuario_carga),
-        modified = NOW()
-    `;
-    await pool.query(query, params);
+    // ⚠️ UPDATE / INSERT explícito, NO "INSERT ... ON DUPLICATE KEY UPDATE".
+    // El upsert por clave única dependía del índice uq_pagos_panel_ddjj; si ese
+    // índice no está creado en la base (la tabla puede haberse creado antes de
+    // la migración), el ON DUPLICATE nunca dispara y CADA GUARDADO INSERTABA UNA
+    // FILA NUEVA. Eso hacía que el mismo mes apareciera repetido en el detalle,
+    // con estados distintos según qué fila tomara el JOIN.
+    // Decidir por id acá no depende de ningún índice.
+    let registroId;
+    if (existing.length) {
+      registroId = existing[0].id;
+      // `estado_pago` queda fuera del SET a propósito: editar un pago ya
+      // confirmado corrige los datos sin desconfirmarlo.
+      await pool.query(
+        `UPDATE pagos_panel SET
+           empresa_id = ?, mes = ?, year = ?,
+           fecha_pago = ?, aplica_interes = ?,
+           importe_fas = ?, importe_solidario = ?, importe_sindical = ?,
+           importe_intereses = ?, total = ?, observaciones = ?, usuario_carga = ?,
+           modified = NOW()
+         WHERE id = ?`,
+        [
+          dj[0].empresa_id,
+          dj[0].mes,
+          dj[0].year,
+          fecha_pago || null,
+          aplicaInteres ? 1 : 0,
+          ovFas,
+          ovSolidario,
+          ovSindical,
+          intereses,
+          total,
+          observaciones || null,
+          usuario_carga || null,
+          registroId,
+        ]
+      );
 
-    const [saved] = await pool.query(
-      `SELECT * FROM pagos_panel WHERE declaracion_jurada_id = ?`,
-      [declaracion_jurada_id]
-    );
+      // Autolimpieza: si quedaron filas duplicadas de antes del fix, se borran
+      // las sobrantes para que el período no vuelva a aparecer repetido.
+      await pool.query(
+        `DELETE FROM pagos_panel WHERE declaracion_jurada_id = ? AND id <> ?`,
+        [declaracion_jurada_id, registroId]
+      );
+    } else {
+      const [ins] = await pool.query(
+        `INSERT INTO pagos_panel
+           (declaracion_jurada_id, empresa_id, mes, year, fecha_pago, aplica_interes,
+            importe_fas, importe_solidario, importe_sindical, importe_intereses,
+            total, observaciones, usuario_carga, created, modified)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+        [
+          declaracion_jurada_id,
+          dj[0].empresa_id,
+          dj[0].mes,
+          dj[0].year,
+          fecha_pago || null,
+          aplicaInteres ? 1 : 0,
+          ovFas,
+          ovSolidario,
+          ovSindical,
+          intereses,
+          total,
+          observaciones || null,
+          usuario_carga || null,
+        ]
+      );
+      registroId = ins.insertId;
+    }
+
+    const [saved] = await pool.query(`SELECT * FROM pagos_panel WHERE id = ?`, [
+      registroId,
+    ]);
     return saved[0];
   },
 

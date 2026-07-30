@@ -51,6 +51,10 @@ ORDER BY
     COUNT(DISTINCT CASE WHEN emp.sindicato_activo = 1 THEN emp.id END) AS cantidad_afiliados_declaracion,
     d.year,
     d.mes,
+    -- Fecha en que se CARGÓ la declaración. Determina qué fórmula del aporte
+    -- solidario aplica al mostrarla (ver shared/utils/aportes.ts). NO usar
+    -- mes/year para eso: el período no dice cuándo se cargó la declaración.
+    d.fecha AS fecha_carga,
     d.rectificada,
     d.vencimiento,
     d.fecha_pago,
@@ -79,6 +83,10 @@ WHERE
     CASE WHEN emp.sindicato_activo = 1 THEN 'Sí' ELSE 'No' END AS afiliado,
     emp.cuil,
     s.sueldo_basico,
+    -- Presentismo CONGELADO al cargar la DDJJ. Las declaraciones anteriores al
+    -- cambio no tienen el dato (NULL) y muestran 0: es correcto, en ese momento
+    -- el aporte se calculaba sólo sobre el básico de la categoría.
+    COALESCE(s.presentismo, 0) AS presentismo,
     s.monto,
     s.remunerativo_adicional,
     s.adicional_norem AS suma_no_remunerativa,
@@ -515,7 +523,7 @@ WHERE
           );
           const lastIdSalary = resultsLastIdSalary[0].lastId;
 
-          const queryCategoryId = `SELECT id,sueldo_basico FROM categorias WHERE nombre = ?`;
+          const queryCategoryId = `SELECT id,sueldo_basico,presentismo FROM categorias WHERE nombre = ?`;
           const [resultsCategoryId] = await connection.query(queryCategoryId, [
             employee.categora,
           ]);
@@ -526,26 +534,18 @@ WHERE
           }
           const categoryId = resultsCategoryId[0].id;
           const categorySueldoBasico = resultsCategoryId[0].sueldo_basico;
-
-          const queryInsertSalary = `INSERT INTO sueldos (id, contrato_id, declaraciones_jurada_id,adicional, sueldo_basico, categoria_id, sindicato_activo, monto, adicional_norem, remunerativo_adicional, created, modified) VALUES (?, ?, ?, ?, ? , ?, ?, ?, ?, ?, now(), now());`;
-          await connection.query(queryInsertSalary, [
-            lastIdSalary + 1,
-            contractId,
-            lastIdDeclaration + 1,
-            Number(employee.adicionales) || 0,
-            categorySueldoBasico,
-            categoryId,
-            employee.adherido_a_sindicato.toLowerCase() === "si" ? 1 : 0,
-            employee.sueldo_bsico,
-            employee.suma_no_remunerativa || 0,
-            employee.ad_remunerativo || 0
-          ]);
+          // Presentismo vigente de la categoría. NULL (categoría sin monto
+          // cargado) => 0, con lo cual el aporte queda como antes del cambio.
+          const categoryPresentismo =
+            Number(resultsCategoryId[0].presentismo) || 0;
 
           // Convertimos los valores a números y nos aseguramos que sean válidos
           const sueldoBasico = Number(employee.sueldo_bsico) || 0;
           const adicionales = Number(employee.adicionales) || 0;
           const sumaNoRemunerativa = Number(employee.suma_no_remunerativa) || 0;
           const remunerativoAdicional = Number(employee.ad_remunerativo) || 0;
+          const esAfiliado =
+            employee.adherido_a_sindicato.toLowerCase() === "si";
 
           // Calculamos el FAS (1% del sueldo básico de la categoría 1)
           const fas = sueldoBasicoCategoriaGeneral * 0.01;
@@ -555,19 +555,42 @@ WHERE
           let aportes = 0;
 
           // Calculamos el aporte según corresponda
-          if (employee.adherido_a_sindicato.toLowerCase() === "si") {
+          if (esAfiliado) {
             // Si es adherente: 3% del (sueldo básico + adicionales)
             aportes = (sueldoBasico + adicionales + sumaNoRemunerativa + remunerativoAdicional) * 0.03;
             sindicalTotal += aportes;
           } else {
-            // Aporte solidario (no afiliados): 2% FIJO del sueldo básico de la
-            // CATEGORÍA tomado del sistema (tabla categorias). Ya no depende del
-            // sueldo real del empleado ni de adicionales/sumas no remunerativas.
-            // Si categorySueldoBasico es null/0 el aporte da 0 (revisar categoría).
-            aportes = Number(categorySueldoBasico) * 0.02;
-
+            // Aporte solidario (no afiliados): 2% FIJO de (sueldo básico +
+            // presentismo) de la CATEGORÍA, tomados del sistema (tabla
+            // categorias). No depende del sueldo real del empleado ni de
+            // adicionales/sumas no remunerativas, ni de lo que declare la
+            // empresa: por eso el presentismo se configura en Categorías y NO
+            // viene en el Excel. Si la categoría no tiene presentismo cargado
+            // el término suma 0 y el aporte queda como antes del cambio.
+            aportes =
+              (Number(categorySueldoBasico) + categoryPresentismo) * 0.02;
             solidarioTotal += aportes;
           }
+
+          // Se congela el presentismo en la fila de sueldos, igual que el sueldo
+          // básico DE LA CATEGORÍA: el histórico se lee, no se recalcula.
+          // OJO: sueldo_basico = básico de la CATEGORÍA; el sueldo que carga la
+          // empresa en el Excel va en `monto`. El aporte solidario NUNCA se
+          // calcula sobre `monto`.
+          const queryInsertSalary = `INSERT INTO sueldos (id, contrato_id, declaraciones_jurada_id,adicional, sueldo_basico, presentismo, categoria_id, sindicato_activo, monto, adicional_norem, remunerativo_adicional, created, modified) VALUES (?, ?, ?, ?, ?, ? , ?, ?, ?, ?, ?, now(), now());`;
+          await connection.query(queryInsertSalary, [
+            lastIdSalary + 1,
+            contractId,
+            lastIdDeclaration + 1,
+            adicionales,
+            categorySueldoBasico,
+            categoryPresentismo,
+            categoryId,
+            esAfiliado ? 1 : 0,
+            employee.sueldo_bsico,
+            employee.suma_no_remunerativa || 0,
+            employee.ad_remunerativo || 0
+          ]);
 
           // Sumamos al monto total tanto el FAS como los aportes
           amount += fas + aportes;
