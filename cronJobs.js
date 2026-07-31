@@ -3,6 +3,33 @@ import { pool } from "./db/db.js";
 import { transporter } from "./mailer.js";
 import categoryModel from "./models/categoryModel.js";
 
+// ============================================================================
+// INTERRUPTOR DE TAREAS PROGRAMADAS
+//
+// Poner CRONS_HABILITADOS=false en el .env para que esta instancia NO registre
+// ningún cron. Es obligatorio en cualquier instancia que no sea producción:
+// el job del día 15 le manda un mail REAL a todas las empresas de la base, así
+// que dos instancias levantadas = mail duplicado a cada empresa.
+//
+// Por defecto está HABILITADO: si la variable no existe, se comporta como
+// siempre y producción no necesita ningún cambio.
+// ============================================================================
+const CRONS_HABILITADOS =
+  String(process.env.CRONS_HABILITADOS ?? "true").toLowerCase() !== "false";
+
+if (!CRONS_HABILITADOS) {
+  console.log(
+    "⏸  Tareas programadas DESACTIVADAS en esta instancia (CRONS_HABILITADOS=false). " +
+      "No se envían mails ni se promueven sueldos/presentismos."
+  );
+}
+
+/** Registra un cron sólo si esta instancia tiene las tareas habilitadas. */
+const programar = (expresion, tarea) => {
+  if (!CRONS_HABILITADOS) return;
+  cron.schedule(expresion, tarea);
+};
+
 // Función para obtener emails de empresas
 const getCompanyEmails = async () => {
   try {
@@ -45,7 +72,7 @@ Sr. Empresario, recuerde subir la DDJJ del mes, en caso de haberlo hecho desesti
 // `;
 
 // Programar envío para el día 15 de cada mes a las 9:00 AM
-cron.schedule("0 9 15 * *", async () => {
+programar("0 9 15 * *", async () => {
   console.log("Ejecutando envío de correos del día 15...");
   try {
     const correos = await getCompanyEmails();
@@ -107,4 +134,4 @@ const checkAndUpdateSalaries = async () => {
 };
 
 // Job diario de actualización de sueldos básicos y presentismos programados.
-cron.schedule("0 0 * * *", checkAndUpdateSalaries);
+programar("0 0 * * *", checkAndUpdateSalaries);
