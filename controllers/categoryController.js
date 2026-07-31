@@ -40,9 +40,9 @@ const categoryController = {
 
   addCategory: async (req, res, next) => {
     try {
-      const { name, salary } = req.body;
+      const { name, salary, presentismo } = req.body;
 
-      const result = await categoryModel.addCategory(name, salary);
+      const result = await categoryModel.addCategory(name, salary, presentismo);
       response(res, result, 201, "Categoría agregada con éxito");
     } catch (error) {
       handleError(res, error);
@@ -67,9 +67,14 @@ const categoryController = {
   editCategory: async (req, res, next) => {
     try {
       const { id } = req.params;
-      const { name, salary } = req.body;
+      const { name, salary, presentismo } = req.body;
 
-      const result = await categoryModel.editCategory(id, name, salary);
+      const result = await categoryModel.editCategory(
+        id,
+        name,
+        salary,
+        presentismo
+      );
       if (result.affectedRows > 0) {
         response(res, null, 200, "Categoría editada con éxito");
       } else {
@@ -83,12 +88,15 @@ const categoryController = {
   futureSalary: async (req, res, next) => {
     try {
       const { id } = req.params;
-      const { futureSalary, dateChange } = req.body;
+      const { futureSalary, dateChange, futurePresentismo, datePresentismo } =
+        req.body;
 
       const result = await categoryModel.futureSalary(
         id,
         futureSalary,
-        dateChange
+        dateChange,
+        futurePresentismo,
+        datePresentismo
       );
       if (result.affectedRows > 0) {
         response(res, null, 200, "Salario futuro actualizado con éxito");

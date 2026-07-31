@@ -121,11 +121,21 @@ const paymentsPanelController = {
   // PUT /payments-panel/payment
   upsertPayment: async (req, res) => {
     try {
-      const { declaracion_jurada_id } = req.body;
+      const { declaracion_jurada_id, aplica_interes } = req.body;
       if (!declaracion_jurada_id) {
         return handleError(res, null, 400, "declaracion_jurada_id es requerido");
       }
-      const data = await paymentsPanelModel.upsertPayment(req.body);
+
+      // El front manda FormData, así que el flag llega como string ("1"/"0",
+      // "true"/"false"). Se normaliza a 1/0 acá; undefined significa "no lo
+      // mandaron" y el modelo conserva el valor que ya estaba guardado.
+      const payload = { ...req.body };
+      if (aplica_interes !== undefined && aplica_interes !== null) {
+        const v = String(aplica_interes).trim().toLowerCase();
+        payload.aplica_interes = v === "1" || v === "true" ? 1 : 0;
+      }
+
+      const data = await paymentsPanelModel.upsertPayment(payload);
       response(res, data, 200, "Pago guardado con éxito");
     } catch (error) {
       handleError(res, error, 500, "Error al guardar el pago");

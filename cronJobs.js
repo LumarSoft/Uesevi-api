@@ -1,6 +1,34 @@
 import cron from "node-cron";
 import { pool } from "./db/db.js";
 import { transporter } from "./mailer.js";
+import categoryModel from "./models/categoryModel.js";
+
+// ============================================================================
+// INTERRUPTOR DE TAREAS PROGRAMADAS
+//
+// Poner CRONS_HABILITADOS=false en el .env para que esta instancia NO registre
+// ningún cron. Es obligatorio en cualquier instancia que no sea producción:
+// el job del día 15 le manda un mail REAL a todas las empresas de la base, así
+// que dos instancias levantadas = mail duplicado a cada empresa.
+//
+// Por defecto está HABILITADO: si la variable no existe, se comporta como
+// siempre y producción no necesita ningún cambio.
+// ============================================================================
+const CRONS_HABILITADOS =
+  String(process.env.CRONS_HABILITADOS ?? "true").toLowerCase() !== "false";
+
+if (!CRONS_HABILITADOS) {
+  console.log(
+    "⏸  Tareas programadas DESACTIVADAS en esta instancia (CRONS_HABILITADOS=false). " +
+      "No se envían mails ni se promueven sueldos/presentismos."
+  );
+}
+
+/** Registra un cron sólo si esta instancia tiene las tareas habilitadas. */
+const programar = (expresion, tarea) => {
+  if (!CRONS_HABILITADOS) return;
+  cron.schedule(expresion, tarea);
+};
 
 // Función para obtener emails de empresas
 const getCompanyEmails = async () => {
@@ -44,7 +72,7 @@ Sr. Empresario, recuerde subir la DDJJ del mes, en caso de haberlo hecho desesti
 // `;
 
 // Programar envío para el día 15 de cada mes a las 9:00 AM
-cron.schedule("0 9 15 * *", async () => {
+programar("0 9 15 * *", async () => {
   console.log("Ejecutando envío de correos del día 15...");
   try {
     const correos = await getCompanyEmails();
@@ -84,13 +112,26 @@ cron.schedule("0 9 15 * *", async () => {
 // });
 
 // Mantener la función existente de actualización de salarios
+// Promueve los valores programados de las categorías cuya vigencia ya llegó:
+// sueldo_futuro -> sueldo_basico  y  presentismo_futuro -> presentismo.
+//
+// ⚠️ Delega en categoryModel.updateNow(). Antes esta función tenía su PROPIA
+// copia del UPDATE, que sólo contemplaba el sueldo: al agregar el presentismo
+// programado quedó desincronizada y el presentismo nunca se habría promovido.
+// Una sola implementación, en el modelo — no volver a duplicar el SQL acá.
 const checkAndUpdateSalaries = async () => {
-  const now = new Date();
-  const query =
-    "UPDATE categorias SET sueldo_basico = sueldo_futuro, sueldo_futuro = NULL, fecha_vigencia = NULL WHERE fecha_vigencia <= ? AND sueldo_futuro IS NOT NULL";
-
-  await pool.query(query, [now]);
+  try {
+    const r = await categoryModel.updateNow();
+    if (r.affectedRows > 0) {
+      console.log(
+        `Categorías actualizadas: ${r.sueldosActualizados} sueldo(s) básico(s), ` +
+          `${r.presentismosActualizados} presentismo(s).`
+      );
+    }
+  } catch (error) {
+    console.error("Error al promover valores programados de categorías:", error);
+  }
 };
 
-// Mantener el job de actualización de salarios
-cron.schedule("0 0 * * *", checkAndUpdateSalaries);
+// Job diario de actualización de sueldos básicos y presentismos programados.
+programar("0 0 * * *", checkAndUpdateSalaries);
