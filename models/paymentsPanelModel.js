@@ -332,6 +332,7 @@ const paymentsPanelModel = {
         declaracion_jurada_id: r.declaracion_jurada_id,
         aplica_interes: r.aplica_interes,
         pagos_panel_id: r.pagos_panel_id,
+        observaciones: r.observaciones,
       });
       if (r.estado === "Pagado") {
         total_pagado_anio += r.total;
