@@ -33,16 +33,20 @@ const response = (res, data, statusCode = 200, message = "Éxito") => {
 
 const currentYear = () => new Date().getFullYear();
 
+// Vista de montos: 'periodo' (devengado, default) | 'caja' (por fecha de pago).
+const parseMode = (v) => (v === "caja" ? "caja" : "periodo");
+
 const paymentsPanelController = {
   // GET /payments-panel/grid?year=&from=&to=&includeInactive=
   getGrid: async (req, res) => {
     try {
-      const { year, from, to, includeInactive } = req.query;
+      const { year, from, to, includeInactive, mode } = req.query;
       const data = await paymentsPanelModel.getGrid({
         year: Number(year) || currentYear(),
         from: from ? Number(from) : 1,
         to: to ? Number(to) : 12,
         includeInactive: includeInactive === "1" || includeInactive === "true",
+        mode: parseMode(mode),
       });
       response(res, data, 200, "Grilla obtenida con éxito");
     } catch (error) {
@@ -53,11 +57,12 @@ const paymentsPanelController = {
   // GET /payments-panel/summary?year=&month=
   getSummary: async (req, res) => {
     try {
-      const { year, month } = req.query;
+      const { year, month, mode } = req.query;
       if (!month) return handleError(res, null, 400, "Falta el parámetro month");
       const data = await paymentsPanelModel.getSummary({
         year: Number(year) || currentYear(),
         month: Number(month),
+        mode: parseMode(mode),
       });
       response(res, data, 200, "Resumen obtenido con éxito");
     } catch (error) {

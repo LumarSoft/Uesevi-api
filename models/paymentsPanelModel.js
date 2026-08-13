@@ -91,6 +91,64 @@ const VIGENTES_QUERY = `
   WHERE dj.year = ?
 `;
 
+// ============================================================================
+// VISTA "CAJA" (percibido / por fecha de pago real).
+//
+// Mientras VIGENTES_QUERY agrupa por PERÍODO de la declaración (devengado), esta
+// consulta trae los pagos YA CONFIRMADOS y los ubica por su `fecha_pago` real:
+// un pago de una DDJJ de junio cobrado en agosto "cuenta" en agosto.
+//
+// Devuelve exactamente las mismas columnas que VIGENTES_QUERY (para poder
+// reutilizar resolveRow) MÁS `caja_mes` / `caja_year` = MONTH/YEAR(fecha_pago),
+// calculados en SQL para no depender de la zona horaria del proceso Node.
+//
+// Dedup: si por datos sucios hubiera varias filas confirmadas para la misma
+// declaración, se toma la de id más alto (misma lógica de desempate que el resto
+// del modelo), para no contar el mismo pago dos veces.
+// ============================================================================
+const CAJA_QUERY = `
+  SELECT
+    dj.id            AS declaracion_jurada_id,
+    dj.empresa_id,
+    dj.mes,
+    dj.year,
+    dj.subtotal,
+    dj.importe,
+    dj.interes       AS dj_interes,
+    dj.fecha_pago    AS dj_fecha_pago,
+    dj.estado        AS dj_estado,
+    a.fas            AS aux_fas,
+    a.solidario      AS aux_solidario,
+    a.sindical       AS aux_sindical,
+    a.total          AS aux_total,
+    pp.id            AS pp_id,
+    pp.fecha_pago    AS pp_fecha_pago,
+    pp.aplica_interes AS pp_aplica_interes,
+    pp.importe_fas   AS pp_fas,
+    pp.importe_solidario AS pp_solidario,
+    pp.importe_sindical  AS pp_sindical,
+    pp.importe_intereses AS pp_intereses,
+    pp.total         AS pp_total,
+    pp.observaciones AS pp_observaciones,
+    pp.estado_pago   AS pp_estado,
+    MONTH(pp.fecha_pago) AS caja_mes,
+    YEAR(pp.fecha_pago)  AS caja_year
+  FROM (
+    -- Una sola fila confirmada por declaración (la de id más alto).
+    SELECT p.* FROM pagos_panel p
+    INNER JOIN (
+      SELECT declaracion_jurada_id, MAX(id) AS mid
+      FROM pagos_panel
+      WHERE estado_pago = 1 AND fecha_pago IS NOT NULL
+      GROUP BY declaracion_jurada_id
+    ) d ON d.mid = p.id
+  ) pp
+  INNER JOIN declaraciones_juradas dj ON dj.id = pp.declaracion_jurada_id
+  LEFT JOIN auxiliar a
+    ON a.id = (SELECT MAX(a2.id) FROM auxiliar a2 WHERE a2.id_declaracion = dj.id)
+  WHERE YEAR(pp.fecha_pago) = ? AND MONTH(pp.fecha_pago) BETWEEN ? AND ?
+`;
+
 // Resuelve una fila cruda (DDJJ vigente + auxiliar + override) a los valores
 // que consume el panel.
 const resolveRow = (r) => {
@@ -147,9 +205,24 @@ const resolveRow = (r) => {
   };
 };
 
+// Pendientes por empresa (deuda) del año: cuenta los períodos con DDJJ vigente
+// sin pagar. Es un concepto DE PERÍODO, independiente de la vista elegida, así
+// que la vista "caja" lo reutiliza tal cual para el indicador "Pend."/"Al día".
+const pendingByCompanyFromVigentes = (vigRows) => {
+  const map = new Map();
+  for (const raw of vigRows) {
+    const r = resolveRow(raw);
+    if (r.estado === "Pendiente") {
+      map.set(r.empresa_id, (map.get(r.empresa_id) || 0) + 1);
+    }
+  }
+  return map;
+};
+
 const paymentsPanelModel = {
   // GET /payments-panel/grid — grilla multi-mes.
-  getGrid: async ({ year, from, to, includeInactive }) => {
+  // mode: 'periodo' (devengado, default) | 'caja' (percibido, por fecha de pago).
+  getGrid: async ({ year, from, to, includeInactive, mode = "periodo" }) => {
     const rangeFrom = from || 1;
     const rangeTo = to || 12;
 
@@ -159,6 +232,101 @@ const paymentsPanelModel = {
       : `SELECT id, nombre, cuit, estado FROM empresas WHERE estado <> 'Inactivo' ORDER BY nombre ASC`;
     const [companies] = await pool.query(companiesQuery);
 
+    // ---- Vista CAJA: la plata cuenta en el mes en que ENTRÓ (fecha de pago) ----
+    if (mode === "caja") {
+      // Pagos confirmados del año, ubicados por mes de fecha de pago.
+      const [cajaRows] = await pool.query(CAJA_QUERY, [year, 1, 12]);
+      // El indicador de deuda sigue siendo por período.
+      const [vigRows] = await pool.query(VIGENTES_QUERY, [year, year]);
+      const pendByCompany = pendingByCompanyFromVigentes(vigRows);
+
+      // empresa -> mesCaja -> acumulador (con desglose por período que lo compone).
+      const byCompany = new Map();
+      for (const raw of cajaRows) {
+        const r = resolveRow(raw);
+        const cajaMes = Number(raw.caja_mes);
+        if (!byCompany.has(r.empresa_id)) byCompany.set(r.empresa_id, new Map());
+        const mesesMap = byCompany.get(r.empresa_id);
+        if (!mesesMap.has(cajaMes)) {
+          mesesMap.set(cajaMes, {
+            total: 0,
+            fas: 0,
+            solidario: 0,
+            sindical: 0,
+            intereses: 0,
+            periodos: [],
+          });
+        }
+        const b = mesesMap.get(cajaMes);
+        b.total += r.total;
+        b.fas += r.fas;
+        b.solidario += r.solidario;
+        b.sindical += r.sindical;
+        b.intereses += r.intereses;
+        // Cada período (mes de la DDJJ) que cayó en este mes de caja.
+        b.periodos.push({
+          mes: r.mes,
+          monto: round2(r.total),
+          fecha_pago: r.fecha_pago || null,
+        });
+      }
+
+      return companies.map((c) => {
+        const mesesMap = byCompany.get(c.id) || new Map();
+        const meses = [];
+        for (let m = rangeFrom; m <= rangeTo; m++) {
+          const b = mesesMap.get(m);
+          if (b) {
+            const periodos = b.periodos.sort((x, y) => x.mes - y.mes);
+            meses.push({
+              mes: m,
+              monto: round2(b.total),
+              // Si un único período compone el mes, mostramos su fecha; si son
+              // varios, el front muestra "N pagos" y el detalle en el popup.
+              fecha_pago: periodos.length === 1 ? periodos[0].fecha_pago : null,
+              estado: "Pagado",
+              declaracion_jurada_id: null,
+              fas: round2(b.fas),
+              solidario: round2(b.solidario),
+              sindical: round2(b.sindical),
+              intereses: round2(b.intereses),
+              aplica_interes: true,
+              periodos,
+            });
+          } else {
+            meses.push({
+              mes: m,
+              monto: 0,
+              fecha_pago: null,
+              estado: "Sin movimiento",
+              declaracion_jurada_id: null,
+              fas: 0,
+              solidario: 0,
+              sindical: 0,
+              intereses: 0,
+              aplica_interes: true,
+              periodos: [],
+            });
+          }
+        }
+
+        // Total del año por caja: todo lo cobrado en el año (todos los meses).
+        let total_anio = 0;
+        for (const b of mesesMap.values()) total_anio += b.total;
+
+        return {
+          empresa_id: c.id,
+          nombre: c.nombre,
+          cuit: c.cuit,
+          estado_empresa: c.estado,
+          meses,
+          total_anio: round2(total_anio),
+          meses_pendientes: pendByCompany.get(c.id) || 0,
+        };
+      });
+    }
+
+    // ---- Vista PERÍODO (devengado, comportamiento histórico) ----
     // Filas vigentes del año.
     const [rows] = await pool.query(VIGENTES_QUERY, [year, year]);
 
@@ -233,70 +401,97 @@ const paymentsPanelModel = {
   // Por eso "Cobrado del mes" y "Empresas pendientes" se calculan sobre el
   // período = month - 1 (con roll-over de enero -> diciembre del año anterior).
   // "Acumulado del año" sigue siendo todo lo cobrado del año en curso.
-  getSummary: async ({ year, month }) => {
-    // Período cobrado (mes vencido).
-    const periodoMes = month === 1 ? 12 : month - 1;
-    const periodoYear = month === 1 ? year - 1 : year;
-
-    // Filas del año en curso (acumulado anual).
-    const [rowsAnio] = await pool.query(VIGENTES_QUERY, [year, year]);
-    // Filas del año del período cobrado (puede ser el año anterior si month=enero).
-    const [rowsPeriodo] =
-      periodoYear === year
-        ? [rowsAnio]
-        : await pool.query(VIGENTES_QUERY, [periodoYear, periodoYear]);
-
+  getSummary: async ({ year, month, mode = "periodo" }) => {
     const empty = () => ({ fas: 0, solidario: 0, sindical: 0, total: 0 });
-    const cobrado_mes = empty();
-    const acumulado_anio = empty();
-
-    const [companies] = await pool.query(
-      `SELECT COUNT(*) AS total FROM empresas WHERE estado <> 'Inactivo'`
-    );
-    const totalEmpresas = num(companies[0]?.total);
-    const empresasPendientesMes = new Set();
-
-    // Acumulado anual: todo lo pagado del año en curso (cualquier período).
-    for (const raw of rowsAnio) {
-      const r = resolveRow(raw);
-      if (r.estado === "Pagado") {
-        acumulado_anio.fas += r.fas;
-        acumulado_anio.solidario += r.solidario;
-        acumulado_anio.sindical += r.sindical;
-        acumulado_anio.total += r.total;
-      }
-    }
-
-    // Cobrado del mes + pendientes: sobre el período cobrado (mes vencido).
-    for (const raw of rowsPeriodo) {
-      const r = resolveRow(raw);
-      if (r.mes !== periodoMes) continue;
-      if (r.estado === "Pagado") {
-        cobrado_mes.fas += r.fas;
-        cobrado_mes.solidario += r.solidario;
-        cobrado_mes.sindical += r.sindical;
-        cobrado_mes.total += r.total;
-      } else if (r.estado === "Pendiente") {
-        empresasPendientesMes.add(r.empresa_id);
-      }
-    }
-
     const fmt = (o) => ({
       fas: round2(o.fas),
       solidario: round2(o.solidario),
       sindical: round2(o.sindical),
       total: round2(o.total),
     });
+    const acumular = (acc, r) => {
+      acc.fas += r.fas;
+      acc.solidario += r.solidario;
+      acc.sindical += r.sindical;
+      acc.total += r.total;
+    };
+
+    const [companies] = await pool.query(
+      `SELECT COUNT(*) AS total FROM empresas WHERE estado <> 'Inactivo'`
+    );
+    const totalEmpresas = num(companies[0]?.total);
+
+    // Período cobrado (mes vencido). Las EMPRESAS PENDIENTES siempre se miden por
+    // período (deuda), en ambas vistas.
+    const periodoMes = month === 1 ? 12 : month - 1;
+    const periodoYear = month === 1 ? year - 1 : year;
+    const [rowsPeriodo] = await pool.query(VIGENTES_QUERY, [
+      periodoYear,
+      periodoYear,
+    ]);
+    const empresasPendientesMes = new Set();
+    for (const raw of rowsPeriodo) {
+      const r = resolveRow(raw);
+      if (r.mes === periodoMes && r.estado === "Pendiente") {
+        empresasPendientesMes.add(r.empresa_id);
+      }
+    }
+    const empresas_pendientes = {
+      pendientes: empresasPendientesMes.size,
+      total: totalEmpresas,
+    };
+
+    // ---- Vista CAJA: "cobrado del mes" = plata que ENTRÓ en el mes elegido ----
+    if (mode === "caja") {
+      const [rowsMes] = await pool.query(CAJA_QUERY, [year, month, month]);
+      const [rowsAnioCaja] = await pool.query(CAJA_QUERY, [year, 1, 12]);
+      const cobrado_mes = empty();
+      const acumulado_anio = empty();
+      for (const raw of rowsMes) acumular(cobrado_mes, resolveRow(raw));
+      for (const raw of rowsAnioCaja) acumular(acumulado_anio, resolveRow(raw));
+      return {
+        cobrado_mes: fmt(cobrado_mes),
+        acumulado_anio: fmt(acumulado_anio),
+        empresas_pendientes,
+        // `periodo` rotula SOLO la tarjeta de pendientes, que siempre se mide por
+        // mes vencido en ambas vistas. La tarjeta de "cobrado" en caja usa el mes
+        // literal directamente (prop `month` en el front), así que acá va el
+        // vencido, no `month`.
+        periodo: { mes: periodoMes, year: periodoYear },
+        mode: "caja",
+      };
+    }
+
+    // ---- Vista PERÍODO (devengado, comportamiento histórico) ----
+    // Filas del año en curso (acumulado anual). Si el período cobrado cae en el
+    // mismo año, reutilizamos las filas ya traídas para pendientes.
+    const [rowsAnio] =
+      periodoYear === year
+        ? [rowsPeriodo]
+        : await pool.query(VIGENTES_QUERY, [year, year]);
+    const cobrado_mes = empty();
+    const acumulado_anio = empty();
+
+    // Acumulado anual: todo lo pagado del año en curso (cualquier período).
+    for (const raw of rowsAnio) {
+      const r = resolveRow(raw);
+      if (r.estado === "Pagado") acumular(acumulado_anio, r);
+    }
+
+    // Cobrado del mes: sobre el período cobrado (mes vencido).
+    for (const raw of rowsPeriodo) {
+      const r = resolveRow(raw);
+      if (r.mes !== periodoMes) continue;
+      if (r.estado === "Pagado") acumular(cobrado_mes, r);
+    }
 
     return {
       cobrado_mes: fmt(cobrado_mes),
       acumulado_anio: fmt(acumulado_anio),
-      empresas_pendientes: {
-        pendientes: empresasPendientesMes.size,
-        total: totalEmpresas,
-      },
+      empresas_pendientes,
       // Período efectivamente cobrado (para rotular las tarjetas en el front).
       periodo: { mes: periodoMes, year: periodoYear },
+      mode: "periodo",
     };
   },
 
