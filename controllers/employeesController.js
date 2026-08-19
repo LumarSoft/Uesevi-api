@@ -1,5 +1,9 @@
 import employeesModel from "../models/employeesModel.js";
 import { pool } from "../db/db.js";
+import {
+  validateEmployees,
+  buildErrorMessage,
+} from "../utils/employeeImportValidation.js";
 
 // Función de manejo de errores
 const handleError = (
@@ -20,6 +24,28 @@ const handleError = (
     message,
     error: error?.message || null, // Detalles adicionales del error, si están disponibles
   });
+};
+
+// Respuesta de validación: además del mensaje devuelve el detalle fila por fila
+// para que el front pueda listar exactamente qué corregir en el Excel.
+const validationError = (res, errors, statusCode = 422) => {
+  const message = buildErrorMessage(errors);
+  console.warn("Validación de importación fallida:", errors);
+
+  res.status(statusCode).json({
+    ok: false,
+    status: "validation_error",
+    statusCode,
+    message,
+    errors,
+    data: null,
+  });
+};
+
+// Categorías vigentes del sistema, para validar la columna "Categoría".
+const getValidCategories = async () => {
+  const [rows] = await pool.query("SELECT nombre FROM categorias");
+  return rows.map((row) => row.nombre);
 };
 
 // Función de respuesta estándar
@@ -164,26 +190,31 @@ const employeesController = {
     try {
       const { employees, companyId, month, year } = req.body;
 
-      // Validación de CUIL duplicados
-      const cuils = new Set();
-      for (const employee of employees) {
-        const cuil = String(employee.cuil).trim(); // Normalizar el CUIL
-
-        if (cuils.has(cuil)) {
-          console.log(`CUIL duplicado encontrado: ${cuil}`); // Log para verificar el duplicado
-          return handleError(
-            res,
-            null,
-            400,
-            `Error: CUIL duplicado encontrado: ${cuil}` // Asegurarnos de enviar el CUIL en conflicto
-          );
-        }
-        cuils.add(cuil);
+      if (!companyId || !month || !year) {
+        return handleError(
+          res,
+          null,
+          400,
+          "Faltan datos para cargar la declaración: empresa, mes o año."
+        );
       }
 
-      // Proceder con la importación si no hay duplicados
-      const result = await employeesModel.importEmployees(
+      // Validamos TODO el archivo antes de abrir la transacción. Antes se iba
+      // directo a la base: una fila sin CUIL rompía la query, se hacía rollback
+      // y el error se perdía, así que el usuario veía "cargada" una declaración
+      // que nunca se guardó.
+      const validCategories = await getValidCategories();
+      const { errors, employees: validatedEmployees } = validateEmployees(
         employees,
+        { validCategories }
+      );
+
+      if (errors.length > 0) {
+        return validationError(res, errors);
+      }
+
+      const result = await employeesModel.importEmployees(
+        validatedEmployees,
         companyId,
         month,
         year
@@ -194,9 +225,33 @@ const employeesController = {
         return handleError(res, null, 409, result.message);
       }
 
-      response(res, result, 201, "Empleados importados con éxito");
+      if (result?.status !== "OK") {
+        return handleError(
+          res,
+          null,
+          500,
+          "No se pudo generar la declaración jurada. No se guardó ningún dato, volvé a intentarlo."
+        );
+      }
+
+      response(
+        res,
+        result,
+        201,
+        `Declaración jurada cargada con éxito (${result.empleados} empleados).`
+      );
     } catch (error) {
-      handleError(res, error);
+      // La transacción ya hizo rollback: se lo decimos explícitamente al
+      // usuario junto con el detalle (los errores del modelo indican la fila).
+      handleError(
+        res,
+        null,
+        500,
+        `No se pudo cargar la declaración jurada y no se guardó ningún dato. Detalle: ${
+          error?.message || "error inesperado en el servidor"
+        }`
+      );
+      console.error("Error al importar empleados:", error);
     }
   },
 

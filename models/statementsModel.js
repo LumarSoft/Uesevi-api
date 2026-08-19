@@ -1,4 +1,8 @@
 import { pool } from "../db/db.js";
+import {
+  isAfiliado,
+  excelRowNumber,
+} from "../utils/employeeImportValidation.js";
 
 const statementsModel = {
   getAll: async () => {
@@ -347,6 +351,15 @@ WHERE
           const [resultsCategoryId] = await connection.query(queryCategoryId, [
             employee.categora,
           ]);
+          if (!resultsCategoryId.length) {
+            throw new Error(
+              `Fila ${excelRowNumber(index)}: la categoría "${
+                employee.categora
+              }" no existe en el sistema (empleado ${employee.nombre} ${
+                employee.apellido
+              }, CUIL ${employee.cuil}).`
+            );
+          }
           const categoryId = resultsCategoryId[0].id;
 
           //Si el empleado no existe en la base de datos, lo agregamos
@@ -357,7 +370,11 @@ WHERE
             const lastIdUser = resultsLastId[0].lastId;
 
             // Insertamos el usuario
-            const queryInsertUser = `INSERT INTO usuarios (id, nombre, apellido, rol, estado, created, modified) VALUES (?, ?, ?, ?, ?, NOW(), NOW());`;
+            // email y password son NOT NULL sin default: se explicitan en ''
+            // (es el valor que la base ya tiene en los empleados creados por
+            // esta vía). Sin esto la carga falla si MySQL corre en modo
+            // estricto, y antes ese fallo se reportaba como éxito.
+            const queryInsertUser = `INSERT INTO usuarios (id, nombre, apellido, email, password, rol, estado, created, modified) VALUES (?, ?, ?, '', '', ?, ?, NOW(), NOW());`;
 
             await connection.query(queryInsertUser, [
               lastIdUser + 1,
@@ -382,7 +399,7 @@ WHERE
               employee.cuil,
               lastIdUser + 1,
               categoryId,
-              employee.adherido_a_sindicato.toLowerCase() === "si" ? 1 : 0,
+              isAfiliado(employee.adherido_a_sindicato) ? 1 : 0,
             ]);
 
             // Buscamos el ultimo id de la tabla contratos
@@ -408,7 +425,7 @@ WHERE
             const queryUpdateEmployee = `UPDATE empleados SET categoria_id = ?, sindicato_activo = ? WHERE id = ?;`;
             await connection.query(queryUpdateEmployee, [
               categoryId,
-              employee.adherido_a_sindicato.toLowerCase() === "si" ? 1 : 0,
+              isAfiliado(employee.adherido_a_sindicato) ? 1 : 0,
               result.id,
             ]);
 
@@ -437,7 +454,9 @@ WHERE
           }
         } catch (error) {
           console.error(
-            `Error en el primer for con el empleado: ${employee.nombre} ${index}:`,
+            `Error al registrar el empleado ${employee.nombre} ${employee.apellido} (fila ${excelRowNumber(
+              index
+            )}):`,
             error
           );
           throw error;
@@ -514,6 +533,13 @@ WHERE
           const [resultsContractId] = await connection.query(queryContractId, [
             employee.cuil,
           ]);
+          if (!resultsContractId.length) {
+            throw new Error(
+              `Fila ${excelRowNumber(index)}: no se pudo registrar el contrato de ${
+                employee.nombre
+              } ${employee.apellido} (CUIL ${employee.cuil}).`
+            );
+          }
           const contractId = resultsContractId[0].id;
 
           // Ahora que tenemos el id del contrato de la persona insertamos en sueldos
@@ -529,7 +555,11 @@ WHERE
           ]);
           if (!resultsCategoryId || resultsCategoryId.length === 0) {
             throw new Error(
-              `Categoría inexistente: "${employee.categora}" (empleado ${employee.nombre} ${employee.apellido}, CUIL ${employee.cuil}). Verificá que la categoría exista en el sistema.`
+              `Fila ${excelRowNumber(index)}: la categoría "${
+                employee.categora
+              }" no existe en el sistema (empleado ${employee.nombre} ${
+                employee.apellido
+              }, CUIL ${employee.cuil}).`
             );
           }
           const categoryId = resultsCategoryId[0].id;
@@ -544,8 +574,7 @@ WHERE
           const adicionales = Number(employee.adicionales) || 0;
           const sumaNoRemunerativa = Number(employee.suma_no_remunerativa) || 0;
           const remunerativoAdicional = Number(employee.ad_remunerativo) || 0;
-          const esAfiliado =
-            employee.adherido_a_sindicato.toLowerCase() === "si";
+          const esAfiliado = isAfiliado(employee.adherido_a_sindicato);
 
           // Calculamos el FAS (1% del sueldo básico de la categoría 1)
           const fas = sueldoBasicoCategoriaGeneral * 0.01;
@@ -597,7 +626,9 @@ WHERE
           contadorPersonas++;
         } catch (error) {
           console.error(
-            `Error en el segundo for con el empleado: ${employee.nombre} ${index}:`,
+            `Error al calcular los aportes de ${employee.nombre} ${employee.apellido} (fila ${excelRowNumber(
+              index
+            )}):`,
             error
           );
           throw error;
@@ -639,8 +670,19 @@ WHERE
       // Commit de la transacción
       await connection.commit();
       console.log("Transacción completada con éxito.");
+
+      return {
+        status: "OK",
+        declaracionId: lastIdDeclaration + 1,
+        empleados: contadorPersonas,
+        importe: finalAmount,
+        rectificada,
+      };
     } catch (error) {
-      // Si ocurre un error, deshacemos la transacción
+      // Si ocurre un error, deshacemos la transacción.
+      // IMPORTANTE: el error se vuelve a lanzar. Antes se logueaba y se
+      // seguía, así que el controlador respondía "Declaración rectificada con
+      // éxito" aunque el rollback había descartado todo.
       await connection.rollback();
       console.error(
         "Error en la transacción:",
@@ -648,6 +690,7 @@ WHERE
         ". El error ocurrio en la empresa con id: ",
         companyId
       );
+      throw error;
     } finally {
       // Cerramos la conexión
       connection.release();
@@ -688,15 +731,22 @@ WHERE
       // Commit de la transacción
       await connection.commit();
       console.log("Transacción completada con éxito.");
+
+      return { status: "OK", declaracionId: Number(id) };
     } catch (error) {
-      // Si ocurre un error, deshacemos la transacción
+      // Si ocurre un error, deshacemos la transacción y avisamos: antes se
+      // logueaba `companyId` (variable inexistente acá) y el borrado fallido se
+      // reportaba como exitoso.
       await connection.rollback();
       console.error(
-        "Error en la transacción:",
-        error,
-        ". El error ocurrio en la empresa con id: ",
-        companyId
+        "Error al eliminar la declaración con id:",
+        id,
+        error
       );
+      throw error;
+    } finally {
+      // La conexión quedaba tomada del pool en cada borrado.
+      connection.release();
     }
   },
 

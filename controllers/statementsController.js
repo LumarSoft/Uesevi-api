@@ -1,4 +1,9 @@
 import statementsModel from "../models/statementsModel.js";
+import { pool } from "../db/db.js";
+import {
+  validateEmployees,
+  buildErrorMessage,
+} from "../utils/employeeImportValidation.js";
 
 // Función de manejo de errores
 const handleError = (
@@ -8,15 +13,45 @@ const handleError = (
   defaultMessage = "Error interno del servidor"
 ) => {
   console.error("Error en el controlador:", error);
+
+  // El mensaje va en el primer nivel: el front lee `result.message`. Antes
+  // quedaba anidado dentro de `data` y el usuario veía "Error desconocido".
+  const message = error?.message || defaultMessage;
+
   res.status(statusCode).json({
     ok: false,
+    status: "error",
+    statusCode,
+    message,
+    error: error?.message || null,
     data: {
       status: "error",
       statusCode,
-      message: defaultMessage,
+      message,
       error: error?.message || null,
     },
   });
+};
+
+// Respuesta de validación: devuelve el detalle fila por fila del Excel.
+const validationError = (res, errors, statusCode = 422) => {
+  const message = buildErrorMessage(errors);
+  console.warn("Validación de rectificación fallida:", errors);
+
+  res.status(statusCode).json({
+    ok: false,
+    status: "validation_error",
+    statusCode,
+    message,
+    errors,
+    data: null,
+  });
+};
+
+// Categorías vigentes del sistema, para validar la columna "Categoría".
+const getValidCategories = async () => {
+  const [rows] = await pool.query("SELECT nombre FROM categorias");
+  return rows.map((row) => row.nombre);
 };
 
 // Función de respuesta estándar
@@ -202,32 +237,61 @@ const statementsController = {
     try {
       const { employees, companyId, statementId, year, month } = req.body;
 
-      const cuils = new Set();
-      for (const employee of employees) {
-        const cuil = String(employee.cuil).trim();
+      if (!companyId || !statementId) {
+        return handleError(
+          res,
+          null,
+          400,
+          "Faltan datos para rectificar la declaración: empresa o declaración de origen."
+        );
+      }
 
-        if (cuils.has(cuil)) {
-          console.log(`CUIL duplicado encontrado: ${cuil}`);
-          return handleError(
-            res,
-            null,
-            400,
-            `Error: CUIL duplicado encontrado: ${cuil}`
-          );
-        }
-        cuils.add(cuil);
+      // Mismo criterio que la importación: validamos el archivo completo antes
+      // de abrir la transacción y devolvemos los errores fila por fila.
+      const validCategories = await getValidCategories();
+      const { errors, employees: validatedEmployees } = validateEmployees(
+        employees,
+        { validCategories }
+      );
+
+      if (errors.length > 0) {
+        return validationError(res, errors);
       }
 
       const result = await statementsModel.rectify(
-        employees,
+        validatedEmployees,
         companyId,
         statementId,
         year,
         month
       );
-      response(res, result, 201, "Declaración rectificada con éxito");
+
+      if (result?.status !== "OK") {
+        return handleError(
+          res,
+          null,
+          500,
+          "No se pudo rectificar la declaración jurada. No se guardó ningún dato, volvé a intentarlo."
+        );
+      }
+
+      response(
+        res,
+        result,
+        201,
+        `Declaración rectificada con éxito (${result.empleados} empleados).`
+      );
     } catch (error) {
-      handleError(res, error);
+      // La transacción ya hizo rollback: avisamos que no quedó nada guardado.
+      handleError(
+        res,
+        null,
+        500,
+        `No se pudo rectificar la declaración jurada y no se guardó ningún dato. Detalle: ${
+          error?.message || "error inesperado en el servidor"
+        }`
+      );
+      console.error("Error al rectificar la declaración:", error);
     }
   },
 
