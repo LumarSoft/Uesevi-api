@@ -10,9 +10,13 @@ import { calcInterest } from "../utils/interest.js";
 //
 // Regla de resolución de valores:
 //   valor  = pagos_panel.<campo> (si existe fila y no es NULL) | auxiliar.<campo>
-//   estado = 'Pagado'    si pagos_panel.estado_pago = 1 o dj.estado = 1
+//   estado = 'Pagado'    si pagos_panel.estado_pago = 1
 //          | 'Pendiente' si hay DDJJ vigente sin pagar
 //          | 'Sin DDJJ'  si no hay DDJJ para el período
+//
+// El estado de pago del Panel es INDEPENDIENTE de la DDJJ: confirmar o desmarcar
+// un pago acá sólo toca pagos_panel.estado_pago; el estado de la declaración
+// jurada (dj.estado) se gestiona por separado en su propia sección.
 //
 // Ver docs/Uesevi_Evolutivo_Panel_de_Pagos_PLAN_TECNICO.md (Secciones 2 y 3).
 // ============================================================================
@@ -845,9 +849,29 @@ const paymentsPanelModel = {
 
   // POST /payments-panel/payment/:id/confirm — estado_pago = 1 (solo lectura luego).
   // :id = pagos_panel.id
+  //
+  // Sólo cambia el estado de pago del Panel. NO toca la DDJJ: el estado de la
+  // declaración jurada (dj.estado) es un concepto aparte que se gestiona en su
+  // propia sección. Ver nota de independencia en la cabecera del archivo.
   confirmPayment: async (id) => {
     const [result] = await pool.query(
       `UPDATE pagos_panel SET estado_pago = 1, modified = NOW() WHERE id = ?`,
+      [id]
+    );
+    if (result.affectedRows === 0) throw new Error("Registro de pago no encontrado");
+    const [saved] = await pool.query(`SELECT * FROM pagos_panel WHERE id = ?`, [id]);
+    return saved[0];
+  },
+
+  // POST /payments-panel/payment/:id/unconfirm — desmarca el pago.
+  // :id = pagos_panel.id
+  //
+  // Revierte la confirmación del Panel (estado_pago = 0). Igual que confirm,
+  // sólo afecta al Panel: la DDJJ no se toca. Sirve para corregir un pago que
+  // se marcó por error sin tener que ir a la sección Declaraciones Juradas.
+  unconfirmPayment: async (id) => {
+    const [result] = await pool.query(
+      `UPDATE pagos_panel SET estado_pago = 0, modified = NOW() WHERE id = ?`,
       [id]
     );
     if (result.affectedRows === 0) throw new Error("Registro de pago no encontrado");

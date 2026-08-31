@@ -171,6 +171,17 @@ const paymentsPanelController = {
       handleError(res, error, 500, "Error al confirmar el pago");
     }
   },
+
+  // POST /payments-panel/payment/:id/unconfirm
+  unconfirmPayment: async (req, res) => {
+    try {
+      const { id } = req.params;
+      const data = await paymentsPanelModel.unconfirmPayment(Number(id));
+      response(res, data, 200, "Pago desmarcado con éxito");
+    } catch (error) {
+      handleError(res, error, 500, "Error al desmarcar el pago");
+    }
+  },
 };
 
 export default paymentsPanelController;

@@ -31,6 +31,11 @@ router.post(
   "/payment/:id/confirm",
   upload.none(),
   paymentsPanelController.confirmPayment
-); // confirmar (solo lectura luego)
+); // confirmar (sincroniza DDJJ → Pagada)
+router.post(
+  "/payment/:id/unconfirm",
+  upload.none(),
+  paymentsPanelController.unconfirmPayment
+); // desmarcar (sincroniza DDJJ → Pendiente)
 
 export default router;
