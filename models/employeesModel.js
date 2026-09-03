@@ -705,6 +705,45 @@ WHERE
         };
       }
 
+      // GUARD de continuidad: no permitir saltear directo al mes siguiente si
+      // el mes inmediatamente anterior no tiene declaración vigente (ej. un
+      // administrador borró la última declaración y la empresa intenta cargar
+      // el período posterior sin haber resuelto la anterior). Sólo se valida
+      // el mes inmediato anterior, NO todo el historial: hay empresas con
+      // huecos históricos previos a este control (datos migrados de antes de
+      // que existiera esta validación) y revalidar retroactivamente las
+      // dejaría bloqueadas para siempre por algo que no tiene que ver con esto.
+      const [anyStatementRows] = await connection.query(
+        `SELECT id FROM declaraciones_juradas WHERE empresa_id = ? LIMIT 1`,
+        [companyId]
+      );
+
+      if (anyStatementRows.length) {
+        const previousDate = new Date(year, month - 1, 1);
+        previousDate.setMonth(previousDate.getMonth() - 1);
+        const previousMonth = previousDate.getMonth() + 1;
+        const previousYear = previousDate.getFullYear();
+
+        const [previousStatementRows] = await connection.query(
+          `SELECT id FROM declaraciones_juradas
+           WHERE empresa_id = ? AND mes = ? AND year = ? LIMIT 1`,
+          [companyId, previousMonth, previousYear]
+        );
+
+        if (!previousStatementRows.length) {
+          await connection.rollback();
+          console.log(
+            `importEmployees: carga bloqueada para empresa ${companyId}, período ${month}/${year} (falta ${previousMonth}/${previousYear}).`
+          );
+          return {
+            status: "GAP",
+            missingMonth: previousMonth,
+            missingYear: previousYear,
+            message: `No se puede cargar el período ${month}/${year} porque todavía falta la declaración de ${previousMonth}/${previousYear}. Cargue primero ese mes.`,
+          };
+        }
+      }
+
       // Hacemos una query para poner el campo deleted a todos los contratos activos de esa empresa en este momento
       const queryDeleteEmployees = `UPDATE contratos SET deleted = NOW() WHERE empresa_id = ? AND deleted IS NULL;`;
       await connection.query(queryDeleteEmployees, [companyId]);

@@ -225,6 +225,12 @@ const employeesController = {
         return handleError(res, null, 409, result.message);
       }
 
+      // Falta un período anterior sin declarar (ej. se borró una declaración
+      // y quedó un mes adeudado antes del que se quiere cargar ahora).
+      if (result?.status === "GAP") {
+        return handleError(res, null, 409, result.message);
+      }
+
       if (result?.status !== "OK") {
         return handleError(
           res,
