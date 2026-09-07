@@ -13,12 +13,12 @@ const loginModel = {
   },
 
   // Función para generar un JWT
-  generateToken: (user) => {
-    return jwt.sign(
-      { id: user.id, email: user.email, rol: user.rol },
-      process.env.JWT_SECRET,
-      { expiresIn: "1h" }
-    );
+  generateToken: (user, idEmpresa) => {
+    const payload = { id: user.id, email: user.email, rol: user.rol };
+    if (idEmpresa !== undefined) {
+      payload.idEmpresa = idEmpresa;
+    }
+    return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "1h" });
   },
 
   // Función para hashear contraseña
@@ -109,7 +109,7 @@ const loginModel = {
         };
       }
 
-      const token = loginModel.generateToken(user);
+      const token = loginModel.generateToken(user, empresa.id);
 
       await connection.commit(); // Confirmar la transacción
 

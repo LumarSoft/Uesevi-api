@@ -1,8 +1,11 @@
 import express from "express";
 import companiesController from "../controllers/companiesController.js";
 import upload from "../multerconfig.js";
+import { requireRole } from "../middlewares/auth.js";
 
 const router = express.Router();
+
+router.use(requireRole("admin"));
 
 router.get("/", companiesController.getAll); // GET /companies
 

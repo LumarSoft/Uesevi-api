@@ -3,9 +3,12 @@ import path from "path";
 import { fileURLToPath } from "url";
 import http from "http";
 import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 
 import { pool } from "./db/db.js"; // Base de datos
 import "./cronJobs.js"; // Tareas programadas
+import { authRequired } from "./middlewares/auth.js";
 
 // Rutas
 import loginRouter from "./routes/loginRoute.js";
@@ -34,13 +37,32 @@ const startingPort = process.env.PORT || 3010; // Usar variable de entorno para 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Orígenes permitidos (front de producción y desarrollo local)
+const allowedOrigins = [
+  "https://uesevi.org.ar",
+  "http://localhost:3000",
+];
+
 // Middleware
 const setupMiddleware = () => {
   app.use(
+    helmet({
+      // Las imágenes de /uploads se sirven a un origen distinto (el front).
+      crossOriginResourcePolicy: { policy: "cross-origin" },
+    })
+  );
+
+  app.use(
     cors({
-      origin: "*", // Puedes ajustar el origen según tus necesidades
+      origin: allowedOrigins,
       methods: ["GET", "POST", "PUT", "DELETE"],
-      allowedHeaders: ["Origin", "X-Requested-With", "Content-Type", "Accept"],
+      allowedHeaders: [
+        "Origin",
+        "X-Requested-With",
+        "Content-Type",
+        "Accept",
+        "Authorization",
+      ],
       exposedHeaders: ["Content-Length", "Content-Type"],
       credentials: true,
       preflightContinue: false,
@@ -78,8 +100,8 @@ const setupMiddleware = () => {
   });
 
   app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-  app.use(express.json({ limit: "50mb" }));
-  app.use(express.urlencoded({ limit: "50mb", extended: true }));
+  app.use(express.json({ limit: "5mb" }));
+  app.use(express.urlencoded({ limit: "5mb", extended: true }));
 
   // Middleware para pasar el pool de conexiones a las rutas
   app.use((req, res, next) => {
@@ -88,15 +110,37 @@ const setupMiddleware = () => {
   });
 };
 
+// Rate limit fuerte en /login (anti fuerza bruta)
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    ok: false,
+    status: "error",
+    statusCode: 429,
+    message: "Demasiados intentos, intentá de nuevo más tarde",
+  },
+});
+
 // Configuración de rutas
 const setupRoutes = () => {
-  app.use("/login", loginRouter);
+  // ---- 1. Rutas públicas (sin token) ----
+  app.get("/health", (req, res) => res.status(200).send("OK"));
+  app.use("/login", loginLimiter, loginRouter);
+  app.use("/news", newsRouter); // lecturas públicas; escrituras protegidas dentro del router
+  app.use("/inquiries", inquiriesRouter); // POST público; el GET se protege dentro del router
+  app.use("/forms", formRouter); // GET /complete/:cuil y POST / son públicos; resto protegido dentro del router
+
+  // ---- 2. Barrera: a partir de acá, todo exige token ----
+  app.use(authRequired);
+
+  // ---- 3. Rutas protegidas ----
   app.use("/dashboard", dashboardRouter);
   app.use("/companies", companiesRouter);
   app.use("/employees", employeeRouter);
-  app.use("/news", newsRouter);
   app.use("/administrators", adminRouter);
-  app.use("/forms", formRouter);
   app.use("/scales", scaleRouter);
   app.use("/rates", ratesRouter);
   app.use("/category", categoryRouter);
@@ -105,12 +149,8 @@ const setupRoutes = () => {
   app.use("/contracts", contractsRouter);
   app.use("/old-contracts", oldContractsRouter);
   app.use("/old-companies", oldCompaniesRouter);
-  app.use("/inquiries", inquiriesRouter);
   app.use("/basicSalary", basicSalaryRouter);
   app.use("/payments-panel", paymentsPanelRouter);
-  app.get("/health", (req, res) => {
-    res.status(200).send("OK");
-  });
 };
 
 // Función para encontrar un puerto disponible

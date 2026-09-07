@@ -1,11 +1,14 @@
 import express from "express";
 import paymentsPanelController from "../controllers/paymentsPanelController.js";
 import upload from "../multerconfig.js";
+import { requireRole } from "../middlewares/auth.js";
 
 // Panel de Pagos de Empresas — rutas.
 // Ver docs/Uesevi_Evolutivo_Panel_de_Pagos_PLAN_TECNICO.md (Sección 3).
 
 const router = express.Router();
+
+router.use(requireRole("admin"));
 
 // --- Lectura ---
 router.get("/grid", paymentsPanelController.getGrid); // grilla multi-mes
