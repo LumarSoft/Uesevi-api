@@ -21,7 +21,7 @@ node scripts/verificarCambiosAgosto.js   # read-only end-to-end check against th
 `.env` is required before anything starts (`db/config.js` and `mailer.js` read it):
 `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_DATABASE`, `JWT_SECRET`, `MAIL_USER`, `MAIL_PASS` (Gmail *app password*, not the account password), optional `PORT` (default 3010) and `CRONS_HABILITADOS`.
 
-`OPENAI_API_KEY` is optional but required by `/chatbot` (the admin assistant): without it the endpoint answers 503 and the rest of the API keeps working. `OPENAI_MODEL` overrides the model (default `gpt-5.6-luna`); the chatbot uses the OpenAI **Responses** API with `store: false`, so no conversation is retained on OpenAI's side.
+`OPENAI_API_KEY` is optional but required by `/chatbot` (the admin assistant): without it the endpoint answers 503 and the rest of the API keeps working. `OPENAI_MODEL` overrides the model (default `gpt-5.6-luna`); the chatbot uses the OpenAI **Responses** API with `store: false`, so no conversation is retained on OpenAI's side. `POST /chatbot` also accepts an optional `archivo` (the DDJJ Excel an admin was forwarded): it uses its own **memory-storage** multer, never the shared `multerconfig.js` — that one writes into `uploads/`, which is served statically, and a payroll file must not end up public. `utils/chatbotExcel.js` runs it through the same `validateEmployees` as the real import so the diagnosis matches what the company would see.
 
 **Always set `CRONS_HABILITADOS=false` outside production.** `cronJobs.js` mails every company in the database on the 15th of the month; two live instances = duplicate mail to every real company.
 

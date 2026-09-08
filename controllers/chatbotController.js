@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { analizarExcelDeclaracion } from "../utils/chatbotExcel.js";
 import {
   definicionesHerramientas,
   ejecutarHerramienta,
@@ -73,6 +74,18 @@ Hablás en español rioplatense, de manera breve y concreta. Nada de rodeos ni d
 - **categorias** es la escala salarial. La categoría id 1 es la general y su sueldo_basico es la base del FAS.
 - **tasa** tiene una sola fila: porcentaje es la tasa DIARIA de mora.
 
+## Revisión de archivos Excel
+
+A veces el administrador adjunta el Excel de una declaración jurada que una empresa no pudo subir. En ese caso vas a recibir, junto al mensaje, un bloque ANALISIS_DEL_ARCHIVO con el resultado de pasar ese archivo por la MISMA validación que corre la importación real. No es una opinión tuya: es lo que la empresa va a ver si intenta subirlo.
+
+Cuando aparezca ese bloque:
+- Si "es_valido" es true, decí que el archivo pasa la validación y que el problema de la empresa está en otro lado (sesión vencida, período ya declarado, mes anterior sin declarar, o que subió otro archivo).
+- Si hay errores, explicá el problema agrupado por tipo, no fila por fila: primero cuántas filas afecta y qué hay que corregir, después el detalle de las filas concretas (usá el número de fila del Excel que viene en "fila"). Si "errores_omitidos" es mayor que cero, aclarale que hay más casos del mismo tipo.
+- Si faltan columnas obligatorias, ese es el problema principal: el archivo no tiene el formato de la plantilla y hay que decírselo primero. Nombrá las columnas que faltan usando los títulos de "columnas_obligatorias_faltantes", que son los de la plantilla. NUNCA le muestres al usuario las claves internas de "columnas_detectadas" (vienen sin acentos ni espacios, como "categora" o "sueldo_bsico"): son un detalle técnico y confunden.
+- Si una categoría no existe, mostrale las válidas que vienen en "categorias_validas_del_sistema".
+- Cerrá siempre con qué tiene que corregir la empresa, en una lista corta y accionable.
+- No inventes errores que no estén en el bloque, y no uses las herramientas de base de datos para "revisar" el archivo: el análisis ya está hecho.
+
 ## Modificaciones
 
 Podés proponer cambios con las herramientas "proponer_*", pero vos no ejecutás nada: queda una propuesta que el administrador confirma con un botón en el panel. Cuando registres una propuesta, contale al usuario en una o dos líneas qué valor se cambia, de cuánto a cuánto, y que tiene que confirmarla. No inventes que el cambio ya se aplicó.
@@ -122,13 +135,39 @@ const chatbotController = {
         );
       }
 
-      const { mensaje } = req.body;
-      if (!mensaje || typeof mensaje !== "string" || !mensaje.trim()) {
+      const textoPlano = typeof req.body.mensaje === "string" ? req.body.mensaje.trim() : "";
+      // Adjuntar el Excel sin escribir nada es un caso normal: se asume que lo
+      // que quiere es que lo revisemos.
+      const mensaje =
+        textoPlano || (req.file ? "Revisá este Excel de declaración jurada." : "");
+      if (!mensaje) {
         return handleError(res, null, 400, "Falta el mensaje de la consulta");
       }
 
       const input = parsearConversacion(req.body.conversacion);
-      input.push({ role: "user", content: mensaje.trim() });
+
+      // Si vino un Excel adjunto lo analizamos ANTES de llamar al modelo y le
+      // pasamos el informe como contexto del turno. El archivo no se guarda en
+      // ningún lado: vive en memoria durante este request.
+      let analisisArchivo = null;
+      if (req.file) {
+        try {
+          analisisArchivo = await analizarExcelDeclaracion(req.file);
+        } catch (error) {
+          console.error("Error analizando el Excel adjunto:", error);
+          analisisArchivo = {
+            archivo: req.file.originalname,
+            legible: false,
+            error: `No se pudo analizar el archivo: ${error.message}`,
+          };
+        }
+      }
+
+      const contenidoUsuario = analisisArchivo
+        ? `${mensaje}\n\n<ANALISIS_DEL_ARCHIVO>\n${JSON.stringify(analisisArchivo, null, 1)}\n</ANALISIS_DEL_ARCHIVO>`
+        : mensaje;
+
+      input.push({ role: "user", content: contenidoUsuario });
 
       const contexto = { usuarioId: req.user.id };
       const herramientasUsadas = [];
@@ -208,6 +247,15 @@ const chatbotController = {
         res,
         {
           respuesta: respuestaTexto,
+          analisis_archivo: analisisArchivo
+            ? {
+                archivo: analisisArchivo.archivo,
+                legible: analisisArchivo.legible,
+                es_valido: analisisArchivo.es_valido ?? false,
+                filas_leidas: analisisArchivo.filas_leidas ?? 0,
+                cantidad_errores: analisisArchivo.cantidad_errores ?? 0,
+              }
+            : null,
           propuestas,
           herramientas_usadas: herramientasUsadas,
           conversacion: recortarHistorial(input),
