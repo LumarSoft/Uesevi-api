@@ -20,9 +20,9 @@ const MAIL_USER = process.env.MAIL_USER || "uesevirosario@gmail.com";
 
 // Google muestra la contraseña de aplicación en grupos de 4; los espacios no
 // forman parte de la clave y hay que sacarlos.
-const MAIL_PASS = (process.env.MAIL_PASS || "ytzlkqnsolxwbajm").replace(
+const MAIL_PASS = (process.env.MAIL_PASS || "gfzhofwwfduwvrkx").replace(
   /\s/g,
-  ""
+  "",
 );
 
 export const transporter = nodemailer.createTransport({
@@ -50,19 +50,19 @@ transporter
     const esAuth = error?.responseCode === 535 || error?.code === "EAUTH";
 
     console.warn(
-      `⚠️  Envío de correos deshabilitado: ${error?.message || error}`
+      `⚠️  Envío de correos deshabilitado: ${error?.message || error}`,
     );
 
     if (esAuth) {
       console.warn(
         "   Gmail rechazó las credenciales. Generá una contraseña de " +
           "aplicación nueva en https://myaccount.google.com/apppasswords y " +
-          "cargala en api/.env como MAIL_PASS (16 caracteres, sin espacios)."
+          "cargala en api/.env como MAIL_PASS (16 caracteres, sin espacios).",
       );
     }
 
     console.warn(
       "   El resto de la API funciona normalmente: solo no se envían mails " +
-        "(recuperación de contraseña, avisos de alta y vencimientos)."
+        "(recuperación de contraseña, avisos de alta y vencimientos).",
     );
   });
