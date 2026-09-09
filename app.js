@@ -9,6 +9,7 @@ import rateLimit from "express-rate-limit";
 import { pool } from "./db/db.js"; // Base de datos
 import "./cronJobs.js"; // Tareas programadas
 import { authRequired } from "./middlewares/auth.js";
+import { logRequestError, logError, ERROR_LOG_PATH } from "./utils/logger.js";
 
 // Rutas
 import loginRouter from "./routes/loginRoute.js";
@@ -29,6 +30,8 @@ import inquiriesRouter from "./routes/inquiriesRoute.js";
 import newsRouter from "./routes/newsRoute.js";
 import basicSalaryRouter from "./routes/basicSalaryRoute.js";
 import paymentsPanelRouter from "./routes/paymentsPanelRoute.js";
+import chatbotRouter from "./routes/chatbotRoute.js";
+import facturacionRouter from "./routes/facturacionRoute.js";
 
 const app = express();
 const startingPort = process.env.PORT || 3010; // Usar variable de entorno para el puerto
@@ -41,7 +44,29 @@ const __dirname = path.dirname(__filename);
 const allowedOrigins = [
   "https://uesevi.org.ar",
   "http://localhost:3000",
+  "http://localhost:3001", // Next.js cae en 3001 cuando el 3000 está ocupado
 ];
+
+// En producción el detalle técnico de un error (mensaje de MySQL, stack, ruta de
+// archivo) no debe llegar al navegador: queda solo en el log del servidor.
+// El front usa `message` y `errors`; el campo `error` es únicamente de depuración.
+const sanitizeErrorBody = (body, statusCode) => {
+  if (process.env.NODE_ENV !== "production") return body;
+  if (typeof body !== "string") return body;
+
+  let parsed;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    return body; // No es JSON (HTML, texto plano): se deja como está.
+  }
+  if (!parsed || typeof parsed !== "object" || !("error" in parsed)) return body;
+
+  parsed.error = null;
+  // Un 5xx puede traer el mensaje crudo de la base en `message`; se reemplaza.
+  if (statusCode >= 500) parsed.message = "Error interno del servidor";
+  return JSON.stringify(parsed);
+};
 
 // Middleware
 const setupMiddleware = () => {
@@ -83,7 +108,14 @@ const setupMiddleware = () => {
       const endTime = Date.now();
       const duration = endTime - startTime;
       
-      console.log(`✅ Respuesta enviada: ${method} ${url} - Status: ${res.statusCode} - Tiempo: ${duration}ms`);
+      if (res.statusCode >= 400) {
+        // Registra todo error respondido por cualquier controlador (res.status(4xx/5xx).json(...))
+        // Se loguea el cuerpo completo ANTES de sanearlo, así el detalle queda en el servidor.
+        logRequestError({ req, statusCode: res.statusCode, body, error: res.locals.error });
+        body = sanitizeErrorBody(body, res.statusCode);
+      } else {
+        console.log(`✅ Respuesta enviada: ${method} ${url} - Status: ${res.statusCode} - Tiempo: ${duration}ms`);
+      }
       
       return originalSend.call(this, body);
     };
@@ -135,6 +167,10 @@ const setupRoutes = () => {
   app.use("/companies", companiesRouter); // POST / público; administración protegida dentro del router
   app.use("/scales", scaleRouter); // GET /clients público; administración protegida dentro del router
 
+  // Consumo del asistente para la facturación del proveedor: no lo mira un
+  // usuario del panel sino la web de Lumarsoft, con su propio token de header.
+  app.use("/facturacion", facturacionRouter);
+
   // ---- 2. Barrera: a partir de acá, todo exige token ----
   app.use(authRequired);
 
@@ -151,6 +187,21 @@ const setupRoutes = () => {
   app.use("/old-companies", oldCompaniesRouter);
   app.use("/basicSalary", basicSalaryRouter);
   app.use("/payments-panel", paymentsPanelRouter);
+  app.use("/chatbot", chatbotRouter);
+
+  // ---- 4. Manejador central de errores (next(err) o excepciones en handlers sync) ----
+  app.use((err, req, res, next) => {
+    res.locals.error = err;
+    const statusCode = err.statusCode || err.status || 500;
+    if (res.headersSent) return next(err);
+    res.status(statusCode).json({
+      ok: false,
+      status: "error",
+      statusCode,
+      message: statusCode >= 500 ? "Error interno del servidor" : err.message,
+      error: process.env.NODE_ENV === "production" ? null : err.message,
+    });
+  });
 };
 
 // Función para encontrar un puerto disponible
@@ -181,14 +232,27 @@ const findAvailablePort = (port) => {
 };
 
 process.on("uncaughtException", (error) => {
-  console.error("Uncaught Exception:", error);
-  // Aquí puedes agregar lógica para registrar el error en un archivo de log
+  logError("uncaughtException", error);
 });
 
-process.on("unhandledRejection", (reason, promise) => {
-  console.error("Unhandled Rejection at:", promise, "reason:", reason);
-  // Aquí puedes agregar lógica para registrar el error en un archivo de log
+process.on("unhandledRejection", (reason) => {
+  logError("unhandledRejection", reason);
 });
+
+// Verifica la conexión a la base al arrancar: el error más común en local es de credenciales/puerto.
+pool
+  .query("SELECT 1")
+  .then(() => console.log("🗄️  Conexión a MySQL OK"))
+  .catch((err) =>
+    logError("db-connect", err, {
+      host: process.env.DB_HOST,
+      port: process.env.DB_PORT,
+      user: process.env.DB_USER,
+      database: process.env.DB_DATABASE,
+    })
+  );
+
+console.log(`📝 Errores registrados en ${ERROR_LOG_PATH}`);
 
 // Inicialización
 setupMiddleware();
