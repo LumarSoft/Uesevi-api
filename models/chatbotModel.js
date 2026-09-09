@@ -632,13 +632,42 @@ const chatbotModel = {
     };
   },
 
+  /**
+   * Búsqueda de empleados por nombre, apellido, email o CUIL.
+   *
+   * El texto se parte en palabras y se exige que TODAS aparezcan en alguno de
+   * esos campos. Antes se comparaba la frase entera contra cada campo y contra
+   * `CONCAT(nombre, ' ', apellido)`, así que sólo funcionaba escribiendo el
+   * nombre primero: "Antonelli, Sergio" —tal como lo muestra el listado del
+   * panel— no encontraba a nadie, y Nacho respondía que el empleado no existe.
+   * La coma y cualquier otro separador se ignoran.
+   */
   searchEmployees: async ({ texto = "", limit = 15 }) => {
-    const like = `%${texto}%`;
-    const digitos = soloDigitos(texto);
-    const filtroCuil = digitos ? "REPLACE(REPLACE(emp.cuil, '-', ''), ' ', '') LIKE ? OR" : "";
+    const palabras = String(texto ?? "")
+      .split(/[\s,;]+/)
+      .map((palabra) => palabra.trim())
+      .filter(Boolean)
+      .slice(0, 6); // más de seis palabras es basura, no una búsqueda
+
+    if (!palabras.length) return [];
+
+    const condiciones = [];
     const params = [];
-    if (digitos) params.push(`%${digitos}%`);
-    params.push(like, like, like, like, limit);
+    for (const palabra of palabras) {
+      const like = `%${palabra}%`;
+      const partes = ["u.nombre LIKE ?", "u.apellido LIKE ?", "u.email LIKE ?"];
+      params.push(like, like, like);
+
+      // Un CUIL puede venir con guiones o con puntos: se comparan sólo los
+      // dígitos contra la columna igualmente normalizada.
+      const digitos = soloDigitos(palabra);
+      if (digitos) {
+        partes.push("REPLACE(REPLACE(emp.cuil, '-', ''), ' ', '') LIKE ?");
+        params.push(`%${digitos}%`);
+      }
+      condiciones.push(`(${partes.join(" OR ")})`);
+    }
+    params.push(limit);
 
     const query = `
       SELECT emp.id, emp.cuil, emp.numero_socio, emp.sindicato_activo,
@@ -651,10 +680,7 @@ const chatbotModel = {
       LEFT JOIN categorias cat ON cat.id = emp.categoria_id
       LEFT JOIN contratos c ON c.empleado_id = emp.id AND c.deleted IS NULL AND c.estado = '1'
       LEFT JOIN empresas e ON e.id = c.empresa_id
-      WHERE ${filtroCuil}
-         u.nombre LIKE ? OR u.apellido LIKE ?
-         OR CONCAT(COALESCE(u.nombre, ''), ' ', COALESCE(u.apellido, '')) LIKE ?
-         OR u.email LIKE ?
+      WHERE ${condiciones.join(" AND ")}
       ORDER BY u.apellido ASC, u.nombre ASC
       LIMIT ?;
     `;

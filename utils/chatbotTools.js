@@ -192,7 +192,7 @@ export const definicionesHerramientas = [
     type: "function",
     name: "buscar_empleado",
     description:
-      "Busca empleados por CUIL, nombre, apellido o email. Devuelve la empresa en la que está trabajando actualmente (contrato vigente), su categoría y si está afiliado al sindicato.",
+      "Busca empleados por CUIL, nombre, apellido o email. El texto se parte en palabras y tienen que coincidir todas, en cualquier orden: sirve tanto \"Antonelli, Sergio\" como \"Sergio Antonelli\". Si no encuentra nada, reintentá con el apellido solo antes de decir que no existe. Devuelve la empresa en la que está trabajando actualmente (contrato vigente), su categoría y si está afiliado al sindicato.",
     parameters: {
       type: "object",
       properties: {
@@ -637,6 +637,19 @@ export const ejecutarHerramienta = async (nombre, input, contexto) => {
         texto: input.texto ?? "",
         limit: input.limite ?? 15,
       });
+      // La búsqueda exige que todas las palabras coincidan: si no encontró
+      // nada, lo más probable es que sobre una palabra (un segundo nombre que
+      // no está cargado, por ejemplo). Se le dice al modelo cómo reintentar en
+      // vez de que dé por sentado que el empleado no existe.
+      if (!empleados.length) {
+        return {
+          cantidad: 0,
+          empleados: [],
+          sugerencia:
+            "No hubo coincidencias con TODAS las palabras buscadas. Antes de afirmar que no existe, " +
+            "probá de nuevo con una sola palabra (el apellido solo) o con el CUIL.",
+        };
+      }
       return { cantidad: empleados.length, empleados };
     }
 
