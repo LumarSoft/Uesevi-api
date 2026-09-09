@@ -2,7 +2,11 @@ import express from "express";
 import employeesController from "../controllers/employeesController.js";
 import upload from "../multerconfig.js";
 import { requireRole } from "../middlewares/auth.js";
-import { ownCompanyOrAdmin } from "../middlewares/ownership.js";
+import {
+  ownBodyCompanyOrAdmin,
+  ownCompanyOrAdmin,
+  ownEmployeeOrAdmin,
+} from "../middlewares/ownership.js";
 
 const router = express.Router();
 
@@ -24,12 +28,35 @@ router.get("/history/:empleadoId", requireRole("admin"), employeesController.get
 
 router.get("/debug/:empleadoId", requireRole("admin"), employeesController.debugEmployeeData); // GET /employees/debug/:empleadoId - TEMPORAL
 
-router.put("/:id", requireRole("admin"), upload.none(), employeesController.editEmployee); // PUT /employees/:id
+router.put(
+  "/:id",
+  requireRole("admin", "empresa"),
+  ownEmployeeOrAdmin("id"),
+  upload.none(),
+  employeesController.editEmployee
+); // PUT /employees/:id
 
-router.delete("/:id", requireRole("admin"), employeesController.deleteEmployee); // DELETE /employees/:id
+router.delete(
+  "/:id",
+  requireRole("admin", "empresa"),
+  ownEmployeeOrAdmin("id"),
+  employeesController.deleteEmployee
+); // DELETE /employees/:id
 
-router.post("/", requireRole("admin"), upload.none(), employeesController.addEmployee); // POST /employees
+router.post(
+  "/",
+  requireRole("admin", "empresa"),
+  upload.none(),
+  ownBodyCompanyOrAdmin("companyId"),
+  employeesController.addEmployee
+); // POST /employees
 
-router.post("/import", requireRole("admin"), upload.none(), employeesController.importEmployees); // POST /employees/import
+router.post(
+  "/import",
+  requireRole("admin", "empresa"),
+  upload.none(),
+  ownBodyCompanyOrAdmin("companyId"),
+  employeesController.importEmployees
+); // POST /employees/import
 
 export default router;

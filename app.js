@@ -132,16 +132,16 @@ const setupRoutes = () => {
   app.use("/news", newsRouter); // lecturas públicas; escrituras protegidas dentro del router
   app.use("/inquiries", inquiriesRouter); // POST público; el GET se protege dentro del router
   app.use("/forms", formRouter); // GET /complete/:cuil y POST / son públicos; resto protegido dentro del router
+  app.use("/companies", companiesRouter); // POST / público; administración protegida dentro del router
+  app.use("/scales", scaleRouter); // GET /clients público; administración protegida dentro del router
 
   // ---- 2. Barrera: a partir de acá, todo exige token ----
   app.use(authRequired);
 
   // ---- 3. Rutas protegidas ----
   app.use("/dashboard", dashboardRouter);
-  app.use("/companies", companiesRouter);
   app.use("/employees", employeeRouter);
   app.use("/administrators", adminRouter);
-  app.use("/scales", scaleRouter);
   app.use("/rates", ratesRouter);
   app.use("/category", categoryRouter);
   app.use("/old-statements", oldStatementsRouter);

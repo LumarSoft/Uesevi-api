@@ -2,7 +2,12 @@ import express from "express";
 import statementsController from "../controllers/statementsController.js";
 import upload from "../multerconfig.js";
 import { requireRole } from "../middlewares/auth.js";
-import { ownCompanyOrAdmin } from "../middlewares/ownership.js";
+import {
+  ownBodyCompanyOrAdmin,
+  ownBodyStatementOrAdmin,
+  ownCompanyOrAdmin,
+  ownStatementOrAdmin,
+} from "../middlewares/ownership.js";
 
 const router = express.Router();
 
@@ -40,15 +45,18 @@ router.put("/:id/state", requireRole("admin"), upload.any(), statementsControlle
 
 router.put(
   "/:id/date-payment",
-  requireRole("admin"),
+  requireRole("admin", "empresa"),
+  ownStatementOrAdmin("id"),
   upload.any(),
   statementsController.changeDatePayment
 ); // PUT /statements/:id/date-payment
 
 router.post(
   "/rectifications",
-  requireRole("admin"),
+  requireRole("admin", "empresa"),
   upload.none(),
+  ownBodyCompanyOrAdmin("companyId"),
+  ownBodyStatementOrAdmin("statementId"),
   statementsController.rectify
 ); // POST /statements/rectificar
 
