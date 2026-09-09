@@ -89,6 +89,8 @@ const soloDigitos = (texto) => String(texto ?? "").replace(/\D/g, "");
 
 const aNumero = (valor) => (valor === null || valor === undefined ? null : Number(valor));
 
+const redondear2 = (valor) => Number((Number(valor) || 0).toFixed(2));
+
 const fechaISO = (valor) => {
   if (!valor) return null;
   const fecha = valor instanceof Date ? valor : new Date(valor);
@@ -102,6 +104,10 @@ const fechaISO = (valor) => {
 // Vencimiento de un período: último día del mes siguiente (mismo criterio que
 // utils/interest.js: new Date(year, mes + 1, 0) con mes en base 1).
 const ultimoDiaMesSiguiente = (mes, year) => new Date(year, mes + 1, 0);
+
+// Cuántos períodos sin declarar se listan como máximo (las cantidades totales
+// se informan aparte, sin recortar).
+const TOPE_PERIODOS_LISTADOS = 24;
 
 const hoySinHora = () => {
   const hoy = new Date();
@@ -475,10 +481,29 @@ const chatbotModel = {
        ORDER BY dj.year ASC, dj.mes ASC;`,
       [empresaId]
     );
-    if (!rows.length) return { faltantes: [], desde: null, hasta: null };
 
     const presentes = new Set(rows.map((r) => `${r.year}-${r.mes}`));
-    const primero = rows[0];
+    let primero = rows[0];
+    let sinDeclaraciones = false;
+    let alta = null;
+
+    // Una empresa sin NINGUNA declaración no es una empresa sin períodos
+    // faltantes: es el peor caso posible y antes salía como "no debe nada"
+    // simplemente porque no había ninguna fila desde donde arrancar el rango.
+    // En ese caso el rango arranca en el alta de la empresa.
+    if (!rows.length) {
+      const [empresa] = await pool.query(
+        `SELECT created FROM empresas WHERE id = ? LIMIT 1;`,
+        [empresaId]
+      );
+      if (!empresa[0]?.created) {
+        return { faltantes: [], cantidad_faltantes: 0, cantidad_faltantes_vencidos: 0, desde: null, hasta: null };
+      }
+      sinDeclaraciones = true;
+      const fechaAlta = new Date(empresa[0].created);
+      alta = fechaISO(fechaAlta);
+      primero = { mes: fechaAlta.getMonth() + 1, year: fechaAlta.getFullYear() };
+    }
 
     const hoy = hoySinHora();
     // El período corriente todavía no se puede declarar completo: se controla
@@ -511,8 +536,24 @@ const chatbotModel = {
       }
     }
 
+    const vencidos = faltantes.filter((p) => p.vencido);
+    // El listado se acota para no inflar el contexto del modelo (una empresa que
+    // nunca declaró desde 2020 son más de 50 períodos), pero las cantidades que
+    // se informan son siempre las reales.
+    const recortado = faltantes.length > TOPE_PERIODOS_LISTADOS;
     return {
-      faltantes,
+      faltantes: recortado ? faltantes.slice(-TOPE_PERIODOS_LISTADOS) : faltantes,
+      cantidad_faltantes: faltantes.length,
+      cantidad_faltantes_vencidos: vencidos.length,
+      // El rango real de los faltantes va aparte del listado: si sólo se
+      // informa la lista recortada, el modelo deduce el "desde" del primer
+      // elemento visible y le dice al usuario un período de inicio que no es.
+      primer_periodo_sin_declarar: faltantes[0]?.periodo ?? null,
+      ultimo_periodo_sin_declarar: faltantes[faltantes.length - 1]?.periodo ?? null,
+      primer_periodo_vencido_sin_declarar: vencidos[0]?.periodo ?? null,
+      listado_recortado: recortado,
+      sin_declaraciones: sinDeclaraciones,
+      ...(sinDeclaraciones ? { alta_empresa: alta } : {}),
       desde: { mes: primero.mes, year: primero.year, periodo: periodo(primero.mes, primero.year) },
       hasta: { mes: hastaMes, year: hastaYear, periodo: periodo(hastaMes, hastaYear) },
     };
@@ -663,18 +704,30 @@ const chatbotModel = {
     };
   },
 
-  // Empresas con DDJJ vigentes impagas (estado 0 o 2), vencidas y no
-  // confirmadas en el Panel de Pagos. El monto NO incluye interés por mora:
-  // para eso está companyDebt.
+  /**
+   * Empresas con DDJJ vigentes impagas (estado 0 o 2), vencidas y no
+   * confirmadas en el Panel de Pagos.
+   *
+   * El interés se calcula acá, por declaración, con la misma función que el
+   * Panel de Pagos y que companyDebt: antes esta herramienta devolvía sólo el
+   * saldo sin mora y, para dar un total actualizado, el modelo terminaba
+   * sumando a mano montos que había leído de otra herramienta. Ahora el total
+   * sale de un único lugar.
+   *
+   * `totales` cubre TODAS las empresas deudoras, no sólo las que entran en el
+   * `limit` del listado.
+   */
   debtorCompanies: async ({ limit = 20, incluirInactivas = false }) => {
+    const [tasa] = await pool.query(`SELECT porcentaje FROM tasa ORDER BY id ASC LIMIT 1;`);
+    const porcentaje = Number(tasa[0]?.porcentaje ?? 0);
+
     const filtroEmpresa = incluirInactivas ? "" : "AND e.estado = 'Activo'";
+    // Una fila por declaración impaga: el interés depende del vencimiento de
+    // cada período, así que no se puede agrupar en SQL.
     const query = `
       SELECT e.id, e.nombre, e.cuit, e.estado AS estado_empresa, e.email_contacto, e.telefono,
-             COUNT(*) AS periodos_impagos,
-             SUM(dj.subtotal) AS subtotal_impago,
-             SUM(dj.importe - COALESCE(dj.pago_parcial, 0)) AS saldo_sin_interes,
-             MIN(CONCAT(dj.year, '-', LPAD(dj.mes, 2, '0'))) AS periodo_mas_viejo,
-             MAX(CONCAT(dj.year, '-', LPAD(dj.mes, 2, '0'))) AS periodo_mas_nuevo
+             dj.mes, dj.year, COALESCE(dj.subtotal, dj.importe) AS base,
+             COALESCE(dj.pago_parcial, 0) AS pago_parcial
       FROM declaraciones_juradas dj
       ${JOIN_VIGENTE}
       INNER JOIN empresas e ON e.id = dj.empresa_id
@@ -686,17 +739,82 @@ const chatbotModel = {
         AND dj.vencimiento < CURDATE()
         AND COALESCE(pp.estado_pago, 0) <> 1
         ${filtroEmpresa}
-      GROUP BY e.id, e.nombre, e.cuit, e.estado, e.email_contacto, e.telefono
-      ORDER BY saldo_sin_interes DESC
-      LIMIT ?;
+      ORDER BY e.id ASC, dj.year ASC, dj.mes ASC;
     `;
-    const [rows] = await pool.query(query, [limit]);
-    return rows.map((r) => ({
-      ...r,
-      periodos_impagos: Number(r.periodos_impagos),
-      subtotal_impago: aNumero(r.subtotal_impago),
-      saldo_sin_interes: aNumero(r.saldo_sin_interes),
+    const [rows] = await pool.query(query);
+
+    const hoy = hoySinHora();
+    const porEmpresa = new Map();
+
+    for (const fila of rows) {
+      const base = Number(fila.base) || 0;
+      const parcial = Number(fila.pago_parcial) || 0;
+      const calculo = calcInterest({
+        subtotal: base,
+        mes: fila.mes,
+        year: fila.year,
+        fechaPago: hoy,
+        porcentaje,
+      });
+
+      let empresa = porEmpresa.get(fila.id);
+      if (!empresa) {
+        empresa = {
+          id: fila.id,
+          nombre: fila.nombre,
+          cuit: fila.cuit,
+          estado_empresa: fila.estado_empresa,
+          email_contacto: fila.email_contacto,
+          telefono: fila.telefono,
+          periodos_impagos: 0,
+          subtotal_impago: 0,
+          interes_estimado_a_hoy: 0,
+          saldo_sin_interes: 0,
+          total_estimado_a_hoy: 0,
+          periodo_mas_viejo: null,
+          periodo_mas_nuevo: null,
+        };
+        porEmpresa.set(fila.id, empresa);
+      }
+
+      const clave = `${fila.year}-${String(fila.mes).padStart(2, "0")}`;
+      empresa.periodos_impagos += 1;
+      empresa.subtotal_impago += base;
+      empresa.interes_estimado_a_hoy += calculo.interes;
+      empresa.saldo_sin_interes += base - parcial;
+      empresa.total_estimado_a_hoy += calculo.importe - parcial;
+      if (!empresa.periodo_mas_viejo || clave < empresa.periodo_mas_viejo) empresa.periodo_mas_viejo = clave;
+      if (!empresa.periodo_mas_nuevo || clave > empresa.periodo_mas_nuevo) empresa.periodo_mas_nuevo = clave;
+    }
+
+    const empresas = [...porEmpresa.values()].map((empresa) => ({
+      ...empresa,
+      subtotal_impago: redondear2(empresa.subtotal_impago),
+      interes_estimado_a_hoy: redondear2(empresa.interes_estimado_a_hoy),
+      saldo_sin_interes: redondear2(empresa.saldo_sin_interes),
+      total_estimado_a_hoy: redondear2(empresa.total_estimado_a_hoy),
     }));
+    empresas.sort((a, b) => b.total_estimado_a_hoy - a.total_estimado_a_hoy);
+
+    const totales = empresas.reduce(
+      (acumulado, empresa) => ({
+        subtotal_impago: acumulado.subtotal_impago + empresa.subtotal_impago,
+        interes_estimado_a_hoy: acumulado.interes_estimado_a_hoy + empresa.interes_estimado_a_hoy,
+        saldo_sin_interes: acumulado.saldo_sin_interes + empresa.saldo_sin_interes,
+        total_estimado_a_hoy: acumulado.total_estimado_a_hoy + empresa.total_estimado_a_hoy,
+        periodos_impagos: acumulado.periodos_impagos + empresa.periodos_impagos,
+      }),
+      { subtotal_impago: 0, interes_estimado_a_hoy: 0, saldo_sin_interes: 0, total_estimado_a_hoy: 0, periodos_impagos: 0 }
+    );
+    for (const clave of Object.keys(totales)) totales[clave] = redondear2(totales[clave]);
+
+    return {
+      fecha_calculo: fechaISO(hoy),
+      tasa_diaria_porcentaje: porcentaje,
+      cantidad_empresas_con_deuda: empresas.length,
+      totales,
+      empresas: empresas.slice(0, limit),
+    };
   },
 
   listCategories: async () => {

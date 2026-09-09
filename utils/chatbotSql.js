@@ -93,12 +93,30 @@ export const validarConsultaLectura = (sqlOriginal) => {
     throw new SqlInvalido("La consulta no referencia ninguna tabla conocida.");
   }
 
-  // LIMIT obligatorio y acotado.
-  const limitFinal = minuscula.match(/\blimit\s+(\d+)\s*$/);
+  // LIMIT obligatorio y acotado. Se reconocen las tres formas de MySQL, no sólo
+  // "LIMIT n": si no se contempla el OFFSET, a una consulta paginada se le
+  // agregaba un segundo LIMIT al final y reventaba con error de sintaxis, con
+  // lo cual el asistente no podía traer la segunda tanda de un listado largo.
+  //   LIMIT n
+  //   LIMIT n OFFSET m
+  //   LIMIT m, n   (el primero es el offset)
+  const FIN_LIMIT = /\blimit\s+(\d+)(?:\s*,\s*(\d+)|\s+offset\s+(\d+))?\s*$/i;
+  const limitFinal = minuscula.match(FIN_LIMIT);
   if (!limitFinal) {
     sql = `${sql} LIMIT ${LIMITE_FILAS}`;
-  } else if (Number(limitFinal[1]) > LIMITE_FILAS) {
-    sql = sql.replace(/\blimit\s+\d+\s*$/i, `LIMIT ${LIMITE_FILAS}`);
+  } else {
+    const [, primero, segundoDeComa, offsetExplicito] = limitFinal;
+    const cantidad = segundoDeComa !== undefined ? Number(segundoDeComa) : Number(primero);
+    const desplazamiento =
+      segundoDeComa !== undefined ? Number(primero) : Number(offsetExplicito ?? 0);
+    if (cantidad > LIMITE_FILAS) {
+      // Se normaliza a "LIMIT n OFFSET m" y se recorta la cantidad, pero se
+      // respeta el offset: la paginación que pidió el modelo se mantiene.
+      sql = sql.replace(
+        FIN_LIMIT,
+        `LIMIT ${LIMITE_FILAS}${desplazamiento ? ` OFFSET ${desplazamiento}` : ""}`
+      );
+    }
   }
 
   return sql;

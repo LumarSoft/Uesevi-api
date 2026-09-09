@@ -181,7 +181,7 @@ export const definicionesHerramientas = [
     type: "function",
     name: "deuda_empresa",
     description:
-      "Deuda actual de una empresa: todas sus declaraciones juradas vigentes impagas (estado pendiente o pago parcial, no confirmadas en el Panel de Pagos), con el interés por mora ESTIMADO A HOY calculado con la misma fórmula que usa el Panel de Pagos (subtotal × tasa diaria × días de atraso / 100), más los totales y los períodos que directamente no declaró. Usala siempre que pregunten cuánto debe o cuánto tiene que pagar una empresa; no calcules intereses vos.",
+      "Deuda actual de una empresa: todas sus declaraciones juradas vigentes impagas (estado pendiente o pago parcial, no confirmadas en el Panel de Pagos), con el interés por mora ESTIMADO A HOY calculado con la misma fórmula que usa el Panel de Pagos (subtotal × tasa diaria × días de atraso / 100), más los totales y los períodos que directamente no declaró. Usala siempre que pregunten cuánto debe o cuánto tiene que pagar una empresa; no calcules intereses vos. OJO: un saldo en cero NO quiere decir que la empresa esté al día — mirá siempre 'cantidad_periodos_sin_declarar_vencidos' y el campo 'nunca_declaro'.",
     parameters: {
       type: "object",
       properties: { id_empresa: { type: "integer" } },
@@ -221,7 +221,7 @@ export const definicionesHerramientas = [
     type: "function",
     name: "empresas_deudoras",
     description:
-      "Empresas con declaraciones juradas vencidas e impagas (no confirmadas en el Panel de Pagos), ordenadas por saldo. El saldo NO incluye interés por mora: para el monto actualizado de una empresa puntual usá deuda_empresa.",
+      "Empresas con declaraciones juradas vencidas e impagas (no confirmadas en el Panel de Pagos), ordenadas por deuda, CON el interés por mora estimado a hoy. Devuelve además 'totales', que suma TODAS las empresas deudoras (no sólo las que entran en el límite del listado): usá ese campo cuando pregunten el total general de deuda, nunca sumes vos los montos del listado.",
     parameters: {
       type: "object",
       properties: {
@@ -258,6 +258,8 @@ export const definicionesHerramientas = [
       `Tablas disponibles: ${TABLAS_PERMITIDAS.join(", ")}. ` +
       `Es MySQL 8: usá LIKE (no existe ILIKE) — las comparaciones de texto ya son case-insensitive. ` +
       `Reglas: una sola sentencia SELECT (o WITH ... SELECT), sin comentarios, sin columnas de contraseña, máximo ${LIMITE_FILAS} filas. ` +
+      `Si el resultado se corta, podés traer la tanda siguiente con "LIMIT ${LIMITE_FILAS} OFFSET ${LIMITE_FILAS}" (y así sucesivamente), siempre con el mismo ORDER BY para que no se repitan ni se salteen filas. ` +
+      `Para un total no pagines: pedí el COUNT o el SUM directamente. ` +
       `Recordá que un período de declaración jurada puede tener varias filas (rectificaciones) y sólo vale la de mayor "rectificada": usá el INNER JOIN con MAX(rectificada) agrupado por empresa_id, mes y year. ` +
       `declaraciones_juradas.estado puede ser NULL en filas históricas migradas (2020-2023): no las cuentes como pendientes. ` +
       `Los contratos vigentes son los que tienen deleted IS NULL y estado = '1'. Los nombres de empleados y empresas-usuario están en la tabla usuarios. ` +
@@ -431,7 +433,11 @@ export const resumirResultado = (nombre, resultado) => {
     case "listar_empleados_empresa":
       return plural(resultado.total ?? resultado.cantidad ?? 0, "empleado", "empleados");
     case "empresas_deudoras":
-      return plural(resultado.cantidad ?? 0, "empresa con deuda", "empresas con deuda");
+      return plural(
+        resultado.cantidad_empresas_con_deuda ?? resultado.cantidad ?? 0,
+        "empresa con deuda",
+        "empresas con deuda"
+      );
     case "listar_categorias":
       return plural(resultado.categorias?.length ?? 0, "categoría", "categorías");
     case "tasa_interes":
@@ -488,6 +494,40 @@ const quitarColumnasSensibles = (filas) =>
     return limpia;
   });
 
+/**
+ * Bloque común de "períodos sin declarar" para las herramientas de empresa.
+ * Incluye siempre las cantidades reales (el listado puede venir recortado) y,
+ * si la empresa no tiene ninguna declaración, una advertencia explícita: sin
+ * ella el modelo leía "cero períodos impagos" y respondía que no debe nada.
+ */
+const bloquePeriodosSinDeclarar = (periodos) => {
+  const bloque = {
+    periodos_sin_declarar_vencidos: periodos.faltantes.filter((p) => p.vencido),
+    periodos_sin_declarar_en_termino: periodos.faltantes.filter((p) => !p.vencido),
+    cantidad_periodos_sin_declarar: periodos.cantidad_faltantes ?? 0,
+    cantidad_periodos_sin_declarar_vencidos: periodos.cantidad_faltantes_vencidos ?? 0,
+    primer_periodo_sin_declarar: periodos.primer_periodo_sin_declarar ?? null,
+    primer_periodo_vencido_sin_declarar: periodos.primer_periodo_vencido_sin_declarar ?? null,
+    ultimo_periodo_sin_declarar: periodos.ultimo_periodo_sin_declarar ?? null,
+    rango_controlado: { desde: periodos.desde, hasta: periodos.hasta },
+  };
+  if (periodos.listado_recortado) {
+    bloque.listado_recortado =
+      `Las listas de arriba muestran sólo los ${bloque.periodos_sin_declarar_vencidos.length + bloque.periodos_sin_declarar_en_termino.length} períodos más recientes. ` +
+      "NO deduzcas de ellas desde cuándo no declara: para eso usá 'primer_periodo_sin_declarar', y para las cantidades, los campos 'cantidad_...'.";
+  }
+  if (periodos.sin_declaraciones) {
+    bloque.nunca_declaro = true;
+    bloque.alta_empresa = periodos.alta_empresa;
+    bloque.advertencia =
+      `ATENCIÓN: esta empresa NUNCA presentó una declaración jurada. No tiene importe adeudado ` +
+      `calculado porque no hay ninguna declaración de dónde sacarlo, pero eso NO significa que esté al día: ` +
+      `desde su alta (${periodos.alta_empresa}) acumula ${periodos.cantidad_faltantes_vencidos} período(s) vencidos sin declarar. ` +
+      `Decíselo así al usuario, sin afirmar que no tiene deuda.`;
+  }
+  return bloque;
+};
+
 const NOTA_APROXIMADA =
   "No hubo coincidencia exacta: estas empresas se parecen a lo que escribió el usuario. " +
   "Confirmá con el usuario cuál es antes de responder datos de esa empresa (o usá la que tiene mayor similitud si es claramente la única).";
@@ -524,15 +564,15 @@ export const ejecutarHerramienta = async (nombre, input, contexto) => {
         chatbotModel.missingPeriods(input.id_empresa),
       ]);
       if (!ultima) {
-        return { ultima_declaracion: null, mensaje: "La empresa no tiene declaraciones juradas cargadas." };
+        return {
+          ultima_declaracion: null,
+          mensaje: "La empresa no tiene NINGUNA declaración jurada cargada.",
+          ...bloquePeriodosSinDeclarar(periodos),
+        };
       }
-      const vencidos = periodos.faltantes.filter((p) => p.vencido);
-      const enTermino = periodos.faltantes.filter((p) => !p.vencido);
       return {
         ultima_declaracion: ultima,
-        periodos_sin_declarar_vencidos: vencidos,
-        periodos_sin_declarar_en_termino: enTermino,
-        rango_controlado: { desde: periodos.desde, hasta: periodos.hasta },
+        ...bloquePeriodosSinDeclarar(periodos),
         nota: "Un período está 'en término' hasta el último día del mes siguiente; no es deuda todavía.",
       };
     }
@@ -586,10 +626,9 @@ export const ejecutarHerramienta = async (nombre, input, contexto) => {
       return {
         empresa: { id: empresa.id, nombre: empresa.nombre, cuit: empresa.cuit, estado: empresa.estado },
         ...deuda,
-        periodos_sin_declarar_vencidos: periodos.faltantes.filter((p) => p.vencido),
-        periodos_sin_declarar_en_termino: periodos.faltantes.filter((p) => !p.vencido),
+        ...bloquePeriodosSinDeclarar(periodos),
         nota:
-          "El interés es una estimación al día de hoy con la fórmula del Panel de Pagos; el monto definitivo lo fija el panel al cargar la fecha real de pago. Los períodos sin declarar no tienen importe porque no hay declaración.",
+          "El interés es una estimación al día de hoy con la fórmula del Panel de Pagos; el monto definitivo lo fija el panel al cargar la fecha real de pago. Los períodos sin declarar no tienen importe porque no hay declaración: un saldo en cero con períodos sin declarar NO es una empresa al día.",
       };
     }
 
@@ -611,14 +650,16 @@ export const ejecutarHerramienta = async (nombre, input, contexto) => {
     }
 
     case "empresas_deudoras": {
-      const empresas = await chatbotModel.debtorCompanies({
+      const resultado = await chatbotModel.debtorCompanies({
         limit: input.limite ?? 20,
         incluirInactivas: input.incluir_inactivas === true,
       });
       return {
-        cantidad: empresas.length,
-        empresas,
-        nota: "saldo_sin_interes no incluye la mora. Para el monto actualizado de una empresa usá deuda_empresa.",
+        ...resultado,
+        cantidad: resultado.empresas.length,
+        nota:
+          "Cuenta sólo períodos YA VENCIDOS. 'totales' abarca todas las empresas con deuda vencida, incluso las que no entran en el listado: si te piden un total general usá ese campo tal cual, no sumes los montos del listado. " +
+          "deuda_empresa puede dar un número mayor para una empresa puntual porque también incluye los períodos impagos que todavía no vencieron.",
       };
     }
 
@@ -650,7 +691,11 @@ export const ejecutarHerramienta = async (nombre, input, contexto) => {
         sql_ejecutado: sql,
         cantidad: filas.length,
         ...(filas.length >= LIMITE_FILAS
-          ? { aviso: `El resultado se cortó en ${LIMITE_FILAS} filas: si necesitás totales, agregá en SQL.` }
+          ? {
+              aviso:
+                `El resultado se cortó en ${LIMITE_FILAS} filas. Para un total usá COUNT/SUM en la misma consulta; ` +
+                `para seguir listando repetí la consulta con el mismo ORDER BY y "OFFSET ${LIMITE_FILAS}".`,
+            }
           : {}),
         filas,
       };
