@@ -43,6 +43,7 @@ const __dirname = path.dirname(__filename);
 // Orígenes permitidos (front de producción y desarrollo local)
 const allowedOrigins = [
   "https://uesevi.org.ar",
+  "https://uesevi-app.vercel.app",
   "http://localhost:3000",
   "http://localhost:3001", // Next.js cae en 3001 cuando el 3000 está ocupado
 ];
