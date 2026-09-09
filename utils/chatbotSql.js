@@ -3,9 +3,11 @@ import { TABLAS_PERMITIDAS, COLUMNAS_PROHIBIDAS } from "../models/chatbotModel.j
 export const LIMITE_FILAS = 200;
 
 // Palabras que no tienen ningún motivo para aparecer en una consulta de lectura.
+// "replace" NO está: REPLACE(cuit, '-', '') es la forma normal de comparar
+// CUIT/CUIL, y la sentencia REPLACE INTO queda bloqueada igual por "into".
 const PALABRAS_PROHIBIDAS = [
   "insert", "update", "delete", "drop", "alter", "create", "truncate",
-  "replace", "grant", "revoke", "rename", "lock", "unlock", "call", "handler",
+  "grant", "revoke", "rename", "lock", "unlock", "call", "handler",
   "load_file", "outfile", "dumpfile", "infile", "prepare", "execute",
   "deallocate", "sleep", "benchmark", "information_schema", "performance_schema",
   "mysql", "sys", "user", "database", "version", "set", "into",
@@ -16,6 +18,20 @@ const PALABRAS_PROHIBIDAS = [
 const SOLO_COMO_FUNCION = new Set(["user", "database", "version"]);
 
 class SqlInvalido extends Error {}
+
+// Nombres definidos en la propia consulta (WITH nombre AS (...)) que después
+// aparecen en FROM/JOIN y no son tablas reales.
+const nombresDeCte = (sqlMinuscula) => {
+  const nombres = new Set();
+  // Primer CTE: "with [recursive] nombre as ("; siguientes: ", nombre as (".
+  for (const m of sqlMinuscula.matchAll(/\bwith\s+(?:recursive\s+)?`?([a-z0-9_]+)`?\s*(?:\([^)]*\))?\s*as\s*\(/g)) {
+    nombres.add(m[1]);
+  }
+  for (const m of sqlMinuscula.matchAll(/\)\s*,\s*`?([a-z0-9_]+)`?\s*(?:\([^)]*\))?\s*as\s*\(/g)) {
+    nombres.add(m[1]);
+  }
+  return nombres;
+};
 
 /**
  * Valida una consulta SELECT propuesta por el modelo y devuelve la versión
@@ -61,9 +77,10 @@ export const validarConsultaLectura = (sqlOriginal) => {
   }
 
   // Tablas referenciadas: todo lo que sigue a FROM o JOIN.
-  const referencias = [...minuscula.matchAll(/\b(?:from|join)\s+`?([a-z0-9_]+)`?/g)].map(
-    (m) => m[1]
-  );
+  const ctes = nombresDeCte(minuscula);
+  const referencias = [...minuscula.matchAll(/\b(?:from|join)\s+`?([a-z0-9_]+)`?/g)]
+    .map((m) => m[1])
+    .filter((t) => !ctes.has(t));
   // Los alias de subconsultas no aparecen acá porque "from (" no matchea el patrón.
   const noPermitidas = referencias.filter((t) => !TABLAS_PERMITIDAS.includes(t));
   if (noPermitidas.length) {

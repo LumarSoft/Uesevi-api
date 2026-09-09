@@ -74,6 +74,12 @@ router.post(
   chatbotController.ask
 ); // POST /chatbot
 
+router.get("/uso", requireRole("admin"), chatbotController.uso); // GET /chatbot/uso
+
+router.get("/reporte", requireRole("admin"), chatbotController.reporte); // GET /chatbot/reporte
+
+router.put("/plan", requireRole("admin"), upload.none(), chatbotController.actualizarPlan); // PUT /chatbot/plan
+
 router.post("/confirm", requireRole("admin"), upload.none(), chatbotController.confirm); // POST /chatbot/confirm
 
 router.post("/discard", requireRole("admin"), upload.none(), chatbotController.discard); // POST /chatbot/discard

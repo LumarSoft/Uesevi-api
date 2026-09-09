@@ -1,5 +1,9 @@
 import { randomUUID } from "crypto";
-import chatbotModel, { TABLAS_PERMITIDAS } from "../models/chatbotModel.js";
+import chatbotModel, {
+  TABLAS_PERMITIDAS,
+  COLUMNAS_PROHIBIDAS,
+  ESTADOS_EMPRESA,
+} from "../models/chatbotModel.js";
 import { validarConsultaLectura, SqlInvalido, LIMITE_FILAS } from "./chatbotSql.js";
 
 // ---------------------------------------------------------------------------
@@ -90,15 +94,15 @@ export const definicionesHerramientas = [
     type: "function",
     name: "buscar_empresa",
     description:
-      "Busca empresas por nombre, CUIT o email. Es el primer paso para casi cualquier consulta sobre una empresa: devuelve el id que necesitan las demás herramientas. Si hay varias coincidencias, mostrale las opciones al usuario en vez de adivinar.",
+      "Busca empresas por nombre, CUIT o email. Es el primer paso para casi cualquier consulta sobre una empresa: devuelve el id que necesitan las demás herramientas. Si no hay coincidencia exacta devuelve las más parecidas marcadas como 'coincidencia_aproximada': en ese caso confirmá con el usuario antes de dar datos como si fueran de esa empresa. Si hay varias coincidencias, mostrale las opciones al usuario en vez de adivinar.",
     parameters: {
       type: "object",
       properties: {
         texto: { type: "string", description: "Nombre parcial, CUIT o email de la empresa." },
         estado: {
           type: "string",
-          enum: ["Activo", "Pendiente"],
-          description: "Filtro opcional por estado de la empresa.",
+          enum: ESTADOS_EMPRESA,
+          description: "Filtro opcional por estado de la empresa (Activo, Inactivo o Pendiente de aprobación).",
         },
         limite: { type: "integer", description: "Máximo de resultados (default 15)." },
       },
@@ -109,7 +113,7 @@ export const definicionesHerramientas = [
     type: "function",
     name: "detalle_empresa",
     description:
-      "Datos completos de una empresa por id: CUIT, nombre, email de contacto, teléfono, domicilio, estado y cantidad de empleados activos.",
+      "Datos completos de una empresa por id: CUIT, nombre, email de contacto, teléfono, domicilio, estado, cantidad de empleados activos y afiliados, y el rango de períodos que tiene declarados.",
     parameters: {
       type: "object",
       properties: { id_empresa: { type: "integer" } },
@@ -120,7 +124,7 @@ export const definicionesHerramientas = [
     type: "function",
     name: "ultima_declaracion_empresa",
     description:
-      "Última declaración jurada vigente de una empresa (el período más reciente que declaró), con importe, vencimiento, fecha de pago y estado. Además informa qué períodos le faltan declarar.",
+      "Última declaración jurada vigente de una empresa (el período más reciente que declaró), con importe, desglose FAS/solidario/sindical, vencimiento, estado y si está confirmada como pagada en el Panel de Pagos. Además informa qué períodos le faltan declarar y cuáles de esos ya vencieron.",
     parameters: {
       type: "object",
       properties: { id_empresa: { type: "integer" } },
@@ -131,7 +135,7 @@ export const definicionesHerramientas = [
     type: "function",
     name: "listar_declaraciones_empresa",
     description:
-      "Lista las declaraciones juradas vigentes de una empresa, opcionalmente filtradas por año, mes o estado (0 pendiente, 1 pagada, 2 pago parcial).",
+      "Lista las declaraciones juradas vigentes de una empresa (una por período, ya resuelta la rectificación vigente), opcionalmente filtradas por año, mes o estado (0 pendiente, 1 pagada, 2 pago parcial). Cada una trae importe, desglose y estado de pago en el panel.",
     parameters: {
       type: "object",
       properties: {
@@ -146,9 +150,49 @@ export const definicionesHerramientas = [
   },
   {
     type: "function",
+    name: "detalle_declaracion",
+    description:
+      "Detalle completo de UNA declaración jurada: por id de declaración, o por empresa + mes + año (en ese caso devuelve la vigente del período). Incluye subtotal, interés, importe, vencimiento, fecha de pago, estado, cantidad de empleados y afiliados declarados, el desglose congelado FAS / aporte solidario / aporte sindical (tabla auxiliar) y la confirmación de pago del Panel de Pagos. Usala siempre que pregunten por el desglose o por un período puntual.",
+    parameters: {
+      type: "object",
+      properties: {
+        id_declaracion: { type: "integer" },
+        id_empresa: { type: "integer" },
+        mes: { type: "integer", description: "1 a 12. Se usa junto con id_empresa y year." },
+        year: { type: "integer" },
+      },
+    },
+  },
+  {
+    type: "function",
+    name: "empleados_declaracion",
+    description:
+      "Empleados incluidos en una declaración jurada (foto congelada de la tabla sueldos): CUIL, nombre, categoría, si estaba afiliado al declarar, sueldo declarado, adicionales, y el básico/presentismo de la categoría al momento de la carga. Los aportes individuales por empleado NO están guardados; sólo existe el desglose total de la declaración.",
+    parameters: {
+      type: "object",
+      properties: {
+        id_declaracion: { type: "integer" },
+        limite: { type: "integer", description: "Default 200." },
+      },
+      required: ["id_declaracion"],
+    },
+  },
+  {
+    type: "function",
+    name: "deuda_empresa",
+    description:
+      "Deuda actual de una empresa: todas sus declaraciones juradas vigentes impagas (estado pendiente o pago parcial, no confirmadas en el Panel de Pagos), con el interés por mora ESTIMADO A HOY calculado con la misma fórmula que usa el Panel de Pagos (subtotal × tasa diaria × días de atraso / 100), más los totales y los períodos que directamente no declaró. Usala siempre que pregunten cuánto debe o cuánto tiene que pagar una empresa; no calcules intereses vos.",
+    parameters: {
+      type: "object",
+      properties: { id_empresa: { type: "integer" } },
+      required: ["id_empresa"],
+    },
+  },
+  {
+    type: "function",
     name: "buscar_empleado",
     description:
-      "Busca empleados por CUIL, nombre, apellido o email. Devuelve la empresa en la que está trabajando actualmente (contrato activo), su categoría y si está afiliado al sindicato.",
+      "Busca empleados por CUIL, nombre, apellido o email. Devuelve la empresa en la que está trabajando actualmente (contrato vigente), su categoría y si está afiliado al sindicato.",
     parameters: {
       type: "object",
       properties: {
@@ -161,7 +205,8 @@ export const definicionesHerramientas = [
   {
     type: "function",
     name: "listar_empleados_empresa",
-    description: "Lista los empleados de una empresa con su categoría, puesto y afiliación.",
+    description:
+      "Lista los empleados de una empresa con su categoría, puesto y afiliación. Devuelve también el total real aunque la lista esté limitada.",
     parameters: {
       type: "object",
       properties: {
@@ -176,10 +221,13 @@ export const definicionesHerramientas = [
     type: "function",
     name: "empresas_deudoras",
     description:
-      "Empresas con declaraciones juradas vencidas e impagas, ordenadas por deuda aproximada.",
+      "Empresas con declaraciones juradas vencidas e impagas (no confirmadas en el Panel de Pagos), ordenadas por saldo. El saldo NO incluye interés por mora: para el monto actualizado de una empresa puntual usá deuda_empresa.",
     parameters: {
       type: "object",
-      properties: { limite: { type: "integer", description: "Default 20." } },
+      properties: {
+        limite: { type: "integer", description: "Default 20." },
+        incluir_inactivas: { type: "boolean", description: "Default false: sólo empresas con estado Activo." },
+      },
     },
   },
   {
@@ -199,7 +247,7 @@ export const definicionesHerramientas = [
     type: "function",
     name: "estadisticas_generales",
     description:
-      "Números globales del sistema: empresas activas y pendientes, empleados activos, afiliados y total de declaraciones.",
+      "Números globales del sistema con el mismo criterio que el Dashboard: empresas activas/inactivas/pendientes, empleados activos, afiliados, declaraciones vigentes y declaraciones vencidas impagas.",
     parameters: { type: "object", properties: {} },
   },
   {
@@ -211,14 +259,20 @@ export const definicionesHerramientas = [
       `Es MySQL 8: usá LIKE (no existe ILIKE) — las comparaciones de texto ya son case-insensitive. ` +
       `Reglas: una sola sentencia SELECT (o WITH ... SELECT), sin comentarios, sin columnas de contraseña, máximo ${LIMITE_FILAS} filas. ` +
       `Recordá que un período de declaración jurada puede tener varias filas (rectificaciones) y sólo vale la de mayor "rectificada": usá el INNER JOIN con MAX(rectificada) agrupado por empresa_id, mes y year. ` +
-      `Los contratos vigentes son los que tienen deleted IS NULL y estado = '1'. Los nombres de empleados y empresas-usuario están en la tabla usuarios.`,
+      `declaraciones_juradas.estado puede ser NULL en filas históricas migradas (2020-2023): no las cuentes como pendientes. ` +
+      `Los contratos vigentes son los que tienen deleted IS NULL y estado = '1'. Los nombres de empleados y empresas-usuario están en la tabla usuarios. ` +
+      `Columnas útiles — sueldos: id, contrato_id, declaraciones_jurada_id, mes, year, monto, adicional, adicional_norem, remunerativo_adicional, sueldo_basico, presentismo, categoria_id, sindicato_activo, deleted. ` +
+      `declaraciones_juradas: id, empresa_id, mes, year, rectificada, subtotal, interes, importe, vencimiento, fecha_pago, pago_parcial, estado, fecha. ` +
+      `auxiliar: id_declaracion, id_empresa, fas, solidario, sindical, total. pagos_panel: declaracion_jurada_id, empresa_id, mes, year, fecha_pago, estado_pago, total, aplica_interes. ` +
+      `empleados: id, cuil, usuario_id, sindicato_activo, categoria_id, numero_socio. contratos: id, empleado_id, empresa_id, puesto, fecha_ingreso, estado, deleted. ` +
+      `Pedí siempre las columnas que necesitás (evitá SELECT *).`,
     parameters: {
       type: "object",
       properties: {
         sql: { type: "string", description: "La consulta SELECT completa." },
         explicacion: {
           type: "string",
-          description: "Una línea en español explicando qué busca la consulta.",
+          description: "Una línea en español, para mostrarle al usuario, explicando qué busca la consulta.",
         },
       },
       required: ["sql", "explicacion"],
@@ -238,7 +292,7 @@ export const definicionesHerramientas = [
         telefono: { type: "string" },
         domicilio: { type: "string" },
         ciudad: { type: "string" },
-        estado: { type: "string", enum: ["Activo", "Pendiente"] },
+        estado: { type: "string", enum: ESTADOS_EMPRESA },
       },
       required: ["id_empresa"],
     },
@@ -293,6 +347,104 @@ export const NOMBRES_HERRAMIENTAS_ESCRITURA = new Set([
   "proponer_actualizar_empleado",
 ]);
 
+// ---------------------------------------------------------------------------
+// Textos para el panel: qué está haciendo Nacho mientras corre cada herramienta
+// y un resumen corto de lo que encontró. Se mandan por el stream de eventos y
+// el front los muestra tal cual.
+// ---------------------------------------------------------------------------
+const comillas = (texto) => (texto ? `«${String(texto).trim().slice(0, 60)}»` : "");
+
+const plural = (n, singular, pluralTexto) => `${n} ${n === 1 ? singular : pluralTexto}`;
+
+export const describirHerramienta = (nombre, input = {}) => {
+  switch (nombre) {
+    case "buscar_empresa":
+      return `Buscando la empresa ${comillas(input.texto)}`;
+    case "detalle_empresa":
+      return "Leyendo los datos de la empresa";
+    case "ultima_declaracion_empresa":
+      return "Buscando la última declaración jurada";
+    case "listar_declaraciones_empresa":
+      return input.year ? `Listando declaraciones de ${input.year}` : "Listando declaraciones juradas";
+    case "detalle_declaracion":
+      return input.mes && input.year
+        ? `Abriendo la declaración de ${input.mes}/${input.year}`
+        : "Abriendo el detalle de la declaración";
+    case "empleados_declaracion":
+      return "Leyendo los empleados declarados";
+    case "deuda_empresa":
+      return "Calculando la deuda con intereses a hoy";
+    case "buscar_empleado":
+      return `Buscando al empleado ${comillas(input.texto)}`;
+    case "listar_empleados_empresa":
+      return "Listando los empleados de la empresa";
+    case "empresas_deudoras":
+      return "Buscando empresas con deuda vencida";
+    case "listar_categorias":
+      return "Consultando la escala salarial";
+    case "tasa_interes":
+      return "Consultando la tasa de interés";
+    case "estadisticas_generales":
+      return "Calculando las estadísticas generales";
+    case "consulta_sql":
+      return input.explicacion ? `Consultando la base: ${input.explicacion}` : "Consultando la base de datos";
+    case "proponer_actualizar_empresa":
+      return "Preparando una propuesta de cambio en la empresa";
+    case "proponer_actualizar_categoria":
+      return "Preparando una propuesta de cambio en la categoría";
+    case "proponer_actualizar_tasa":
+      return "Preparando una propuesta de cambio de tasa";
+    case "proponer_actualizar_empleado":
+      return "Preparando una propuesta de cambio en el empleado";
+    default:
+      return "Consultando la base de datos";
+  }
+};
+
+export const resumirResultado = (nombre, resultado) => {
+  if (!resultado || typeof resultado !== "object") return "";
+  if (resultado.error) return "Sin resultado";
+  switch (nombre) {
+    case "buscar_empresa":
+      if (!resultado.cantidad) return "No encontré ninguna empresa";
+      return resultado.coincidencia_aproximada
+        ? `${plural(resultado.cantidad, "coincidencia aproximada", "coincidencias aproximadas")}`
+        : `${plural(resultado.cantidad, "empresa encontrada", "empresas encontradas")}`;
+    case "detalle_empresa":
+      return resultado.nombre ? `${resultado.nombre}` : "";
+    case "ultima_declaracion_empresa":
+      return resultado.ultima_declaracion
+        ? `Período ${resultado.ultima_declaracion.periodo}`
+        : "Sin declaraciones cargadas";
+    case "listar_declaraciones_empresa":
+      return plural(resultado.cantidad ?? 0, "declaración", "declaraciones");
+    case "detalle_declaracion":
+      return resultado.periodo ? `Período ${resultado.periodo}` : "";
+    case "empleados_declaracion":
+      return plural(resultado.cantidad ?? 0, "empleado declarado", "empleados declarados");
+    case "deuda_empresa":
+      return plural(resultado.cantidad_periodos_impagos ?? 0, "período impago", "períodos impagos");
+    case "buscar_empleado":
+      return resultado.cantidad
+        ? plural(resultado.cantidad, "empleado encontrado", "empleados encontrados")
+        : "No encontré ningún empleado";
+    case "listar_empleados_empresa":
+      return plural(resultado.total ?? resultado.cantidad ?? 0, "empleado", "empleados");
+    case "empresas_deudoras":
+      return plural(resultado.cantidad ?? 0, "empresa con deuda", "empresas con deuda");
+    case "listar_categorias":
+      return plural(resultado.categorias?.length ?? 0, "categoría", "categorías");
+    case "tasa_interes":
+      return resultado.porcentaje !== undefined ? `${resultado.porcentaje}% diario` : "";
+    case "estadisticas_generales":
+      return "Listo";
+    case "consulta_sql":
+      return plural(resultado.cantidad ?? 0, "fila", "filas");
+    default:
+      return resultado.propuesta_registrada ? "Propuesta lista para confirmar" : "";
+  }
+};
+
 /**
  * Arma el objeto de cambios comparando contra el registro actual.
  *
@@ -327,6 +479,19 @@ const respuestaPropuesta = (propuesta, estadoActual, cambios) => ({
     "Explicale al usuario exactamente qué va a cambiar y pedile que use el botón Confirmar del panel. No vuelvas a llamar a esta herramienta para el mismo cambio.",
 });
 
+// El validador impide nombrar columnas sensibles, pero un SELECT * sobre
+// usuarios las traería igual: se sacan de cada fila antes de devolverlas.
+const quitarColumnasSensibles = (filas) =>
+  filas.map((fila) => {
+    const limpia = { ...fila };
+    for (const columna of COLUMNAS_PROHIBIDAS) delete limpia[columna];
+    return limpia;
+  });
+
+const NOTA_APROXIMADA =
+  "No hubo coincidencia exacta: estas empresas se parecen a lo que escribió el usuario. " +
+  "Confirmá con el usuario cuál es antes de responder datos de esa empresa (o usá la que tiene mayor similitud si es claramente la única).";
+
 /**
  * Ejecuta una herramienta y devuelve un objeto serializable para el tool_result.
  * `contexto` trae { usuarioId } para poder atribuir las propuestas.
@@ -335,12 +500,17 @@ export const ejecutarHerramienta = async (nombre, input, contexto) => {
   switch (nombre) {
     // ---------------- lecturas ----------------
     case "buscar_empresa": {
-      const empresas = await chatbotModel.searchCompanies({
+      const { empresas, aproximada } = await chatbotModel.searchCompanies({
         texto: input.texto ?? "",
         estado: input.estado ?? null,
         limit: input.limite ?? 15,
       });
-      return { cantidad: empresas.length, empresas };
+      return {
+        cantidad: empresas.length,
+        coincidencia_aproximada: aproximada,
+        ...(aproximada && empresas.length ? { nota: NOTA_APROXIMADA } : {}),
+        empresas,
+      };
     }
 
     case "detalle_empresa": {
@@ -356,10 +526,14 @@ export const ejecutarHerramienta = async (nombre, input, contexto) => {
       if (!ultima) {
         return { ultima_declaracion: null, mensaje: "La empresa no tiene declaraciones juradas cargadas." };
       }
+      const vencidos = periodos.faltantes.filter((p) => p.vencido);
+      const enTermino = periodos.faltantes.filter((p) => !p.vencido);
       return {
         ultima_declaracion: ultima,
-        periodos_faltantes: periodos.faltantes,
+        periodos_sin_declarar_vencidos: vencidos,
+        periodos_sin_declarar_en_termino: enTermino,
         rango_controlado: { desde: periodos.desde, hasta: periodos.hasta },
+        nota: "Un período está 'en término' hasta el último día del mes siguiente; no es deuda todavía.",
       };
     }
 
@@ -374,6 +548,51 @@ export const ejecutarHerramienta = async (nombre, input, contexto) => {
       return { cantidad: declaraciones.length, declaraciones };
     }
 
+    case "detalle_declaracion": {
+      if (input.id_declaracion) {
+        const declaracion = await chatbotModel.getStatement(input.id_declaracion);
+        return declaracion ?? { error: "No existe una declaración jurada con ese id." };
+      }
+      if (input.id_empresa && input.mes && input.year) {
+        const declaracion = await chatbotModel.getStatementByPeriod({
+          empresaId: input.id_empresa,
+          mes: input.mes,
+          year: input.year,
+        });
+        return (
+          declaracion ?? {
+            error: `La empresa no tiene declaración jurada cargada para el período ${input.mes}/${input.year}.`,
+          }
+        );
+      }
+      return { error: "Indicá id_declaracion, o bien id_empresa + mes + year." };
+    }
+
+    case "empleados_declaracion": {
+      const empleados = await chatbotModel.statementEmployees({
+        declaracionId: input.id_declaracion,
+        limit: input.limite ?? 200,
+      });
+      return { cantidad: empleados.length, empleados };
+    }
+
+    case "deuda_empresa": {
+      const empresa = await chatbotModel.getCompany(input.id_empresa);
+      if (!empresa) return { error: "No existe una empresa con ese id." };
+      const [deuda, periodos] = await Promise.all([
+        chatbotModel.companyDebt(input.id_empresa),
+        chatbotModel.missingPeriods(input.id_empresa),
+      ]);
+      return {
+        empresa: { id: empresa.id, nombre: empresa.nombre, cuit: empresa.cuit, estado: empresa.estado },
+        ...deuda,
+        periodos_sin_declarar_vencidos: periodos.faltantes.filter((p) => p.vencido),
+        periodos_sin_declarar_en_termino: periodos.faltantes.filter((p) => !p.vencido),
+        nota:
+          "El interés es una estimación al día de hoy con la fórmula del Panel de Pagos; el monto definitivo lo fija el panel al cargar la fecha real de pago. Los períodos sin declarar no tienen importe porque no hay declaración.",
+      };
+    }
+
     case "buscar_empleado": {
       const empleados = await chatbotModel.searchEmployees({
         texto: input.texto ?? "",
@@ -383,17 +602,24 @@ export const ejecutarHerramienta = async (nombre, input, contexto) => {
     }
 
     case "listar_empleados_empresa": {
-      const empleados = await chatbotModel.listCompanyEmployees({
+      const { total, empleados } = await chatbotModel.listCompanyEmployees({
         empresaId: input.id_empresa,
         soloActivos: input.solo_activos !== false,
         limit: input.limite ?? 100,
       });
-      return { cantidad: empleados.length, empleados };
+      return { total, cantidad: empleados.length, listados: empleados.length, empleados };
     }
 
     case "empresas_deudoras": {
-      const empresas = await chatbotModel.debtorCompanies({ limit: input.limite ?? 20 });
-      return { cantidad: empresas.length, empresas };
+      const empresas = await chatbotModel.debtorCompanies({
+        limit: input.limite ?? 20,
+        incluirInactivas: input.incluir_inactivas === true,
+      });
+      return {
+        cantidad: empresas.length,
+        empresas,
+        nota: "saldo_sin_interes no incluye la mora. Para el monto actualizado de una empresa usá deuda_empresa.",
+      };
     }
 
     case "listar_categorias":
@@ -419,8 +645,15 @@ export const ejecutarHerramienta = async (nombre, input, contexto) => {
         }
         throw error;
       }
-      const filas = await chatbotModel.runReadOnlyQuery(sql);
-      return { sql_ejecutado: sql, cantidad: filas.length, filas };
+      const filas = quitarColumnasSensibles(await chatbotModel.runReadOnlyQuery(sql));
+      return {
+        sql_ejecutado: sql,
+        cantidad: filas.length,
+        ...(filas.length >= LIMITE_FILAS
+          ? { aviso: `El resultado se cortó en ${LIMITE_FILAS} filas: si necesitás totales, agregá en SQL.` }
+          : {}),
+        filas,
+      };
     }
 
     // ---------------- escrituras (sólo propuestas) ----------------
