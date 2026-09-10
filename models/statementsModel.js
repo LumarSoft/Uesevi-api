@@ -48,11 +48,44 @@ ORDER BY
   },
 
   getInfo: async (idEmpresa, idDeclaracion) => {
-    const query = `SELECT 
+    // Cabecera de la declaración. Los contadores salen de `sueldos` (la foto de
+    // ESA declaración), NO del padrón vigente de la empresa: antes esta query
+    // entraba por `contratos ... deleted IS NULL`, así que devolvía los
+    // empleados/afiliados que la empresa tiene HOY. En una declaración vieja o
+    // rectificada eso no tiene nada que ver con lo declarado, y si la empresa
+    // se quedaba sin contratos vigentes la query no devolvía ninguna fila y la
+    // cabecera entera venía vacía.
+    //
+    // Los dos contadores repiten el MISMO criterio que la nómina de abajo
+    // (join a contratos con la empresa de la declaración) para que cabecera y
+    // tabla siempre cierren: hay ~800 declaraciones históricas con filas de
+    // `sueldos` colgando de un contrato de otra empresa —el paso 5 del flujo de
+    // carga busca el contrato por CUIL sin filtrar por empresa_id— y esas filas
+    // no se listan en la nómina.
+    //
+    // `empresas` va con LEFT JOIN a propósito: hay declaraciones migradas cuya
+    // empresa_id no existe en `empresas` (la base no tiene foreign keys). Con
+    // INNER JOIN esas declaraciones dejaban de abrirse; así se muestran con
+    // nombre_empresa en null en vez de romper la pantalla.
+    const query = `SELECT
     d.id,
     e.nombre AS nombre_empresa,
-    COUNT(DISTINCT emp.id) AS cantidad_empleados_declaracion,
-    COUNT(DISTINCT CASE WHEN emp.sindicato_activo = 1 THEN emp.id END) AS cantidad_afiliados_declaracion,
+    (SELECT COUNT(*)
+       FROM sueldos s
+       INNER JOIN contratos c ON c.id = s.contrato_id
+      WHERE s.declaraciones_jurada_id = d.id
+        AND c.empresa_id = d.empresa_id) AS cantidad_empleados_declaracion,
+    -- Afiliados CONGELADOS de la declaración (sueldos.sindicato_activo).
+    -- empleados.sindicato_activo es el estado global de HOY: cada carga lo
+    -- pisa, así que una rectificación sin afiliados borraba los afiliados de
+    -- todas las declaraciones anteriores del mismo empleado.
+    (SELECT COUNT(*)
+       FROM sueldos s
+       INNER JOIN contratos c ON c.id = s.contrato_id
+       INNER JOIN empleados emp ON emp.id = c.empleado_id
+      WHERE s.declaraciones_jurada_id = d.id
+        AND c.empresa_id = d.empresa_id
+        AND COALESCE(s.sindicato_activo, emp.sindicato_activo) = 1) AS cantidad_afiliados_declaracion,
     d.year,
     d.mes,
     -- Fecha en que se CARGÓ la declaración. Determina qué fórmula del aporte
@@ -67,24 +100,35 @@ ORDER BY
     d.sueldo_basico,
     d.estado,
     d.ajuste
-FROM 
-    contratos c
-INNER JOIN 
-    empleados emp ON c.empleado_id = emp.id
-INNER JOIN 
-    usuarios u ON emp.usuario_id = u.id
-INNER JOIN 
-    empresas e ON c.empresa_id = e.id
-INNER JOIN 
-    declaraciones_juradas d ON d.id = ?
-WHERE 
-    c.empresa_id = ?
-    AND c.deleted IS NULL`;
+FROM
+    declaraciones_juradas d
+LEFT JOIN
+    empresas e ON e.id = d.empresa_id
+WHERE
+    d.id = ?
+    AND d.empresa_id = ?`;
     const [result] = await pool.query(query, [idDeclaracion, idEmpresa]);
 
-    const query2 = `SELECT 
-    CONCAT(u.apellido, ' ', u.nombre) AS nombre_completo, 
-    CASE WHEN emp.sindicato_activo = 1 THEN 'Sí' ELSE 'No' END AS afiliado,
+    // Sin cabecera no hay declaración de esa empresa: devolvemos null para que
+    // el controlador responda 404 en lugar de un objeto sin campos.
+    if (!result.length) return null;
+
+    const query2 = `SELECT
+    CONCAT(u.apellido, ' ', u.nombre) AS nombre_completo,
+    -- Afiliación CONGELADA del período (sueldos.sindicato_activo), NO el estado
+    -- global de empleados: ese lo pisa cada carga/rectificación, así que al
+    -- declarar a alguien como no afiliado la nómina de TODAS sus declaraciones
+    -- anteriores pasaba a mostrar "No". El resumen sale del snapshot de
+    -- auxiliar y no cambia, por eso resumen y nómina se contradecían: el
+    -- resumen mostraba aporte sindical y ninguna fila lo tenía (y encima al
+    -- ex afiliado se le calculaba aporte solidario, que no le corresponde).
+    --
+    -- El COALESCE es sólo para los datos migrados del sistema viejo: en 2021 y
+    -- 2022 hay filas de sueldos con sindicato_activo en NULL (no existía el
+    -- snapshot). Ahí no hay dato congelado que leer, así que se mantiene el
+    -- comportamiento anterior (el flag global) en vez de degradarlas a "No".
+    -- De 2023 en adelante no hay ni un NULL, así que el COALESCE nunca entra.
+    CASE WHEN COALESCE(s.sindicato_activo, emp.sindicato_activo) = 1 THEN 'Sí' ELSE 'No' END AS afiliado,
     emp.cuil,
     s.sueldo_basico,
     -- Presentismo CONGELADO al cargar la DDJJ. Las declaraciones anteriores al
@@ -112,9 +156,9 @@ INNER JOIN
 WHERE 
     d.id = ?
     AND c.empresa_id = ?
-    ORDER BY 
-    emp.sindicato_activo DESC,  
-    u.apellido ASC;       
+    ORDER BY
+    COALESCE(s.sindicato_activo, emp.sindicato_activo) DESC,
+    u.apellido ASC;
 
 `;
 
