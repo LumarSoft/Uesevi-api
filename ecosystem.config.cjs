@@ -14,6 +14,8 @@ module.exports = {
       error_file: "logs/err.log",
       out_file: "logs/out.log",
       time: true,
+      // Unifica instancias del cluster por tipo, sin crear un tercer log combinado.
+      merge_logs: true,
     },
   ],
 };
