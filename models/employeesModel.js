@@ -5,6 +5,7 @@ import {
   isAfiliado,
   excelRowNumber,
 } from "../utils/employeeImportValidation.js";
+import { logError } from "../utils/safeLogging.js";
 
 const employeesModel = {
   getAll: async () => {
@@ -82,8 +83,6 @@ WHERE
     `;
 
     const [results] = await pool.query(query, [id]);
-    console.log(results);
-
     // Formatea las fechas
     const formattedResults = results.map((result) => ({
       ...result,
@@ -126,8 +125,6 @@ GROUP BY
     `;
 
     const [results] = await pool.query(query, [id]);
-    console.log(results);
-
     // Formatea las fechas
     const formattedResults = results.map((result) => ({
       ...result,
@@ -166,11 +163,6 @@ WHERE
 
   // Nuevo método para obtener el historial completo de un empleado
   getEmployeeHistory: async (empleadoId) => {
-    console.log(
-      "🔍 Ejecutando consulta de historial para empleadoId:",
-      empleadoId
-    );
-
     // Obtener todos los IDs de empleado que comparten el mismo CUIL
     const idsQuery = `SELECT id FROM empleados WHERE cuil = (SELECT cuil FROM empleados WHERE id = ?)`;
     const [idsResults] = await pool.query(idsQuery, [empleadoId]);
@@ -217,15 +209,8 @@ WHERE
       c.created DESC, c.modified DESC
     `;
 
-    console.log("📝 Query SQL:", query);
-    console.log("🎯 Parámetros:", [empleadoIds]);
-
     const [results] = await pool.query(query, [empleadoIds]);
     console.log("📊 Resultados de la consulta:", results.length, "registros");
-
-    if (results.length > 0) {
-      console.log("📋 Primer resultado:", results[0]);
-    }
 
     // Agrupar contratos por empresa
     const groupedByCompany = {};
@@ -331,13 +316,6 @@ WHERE
     );
 
     console.log("📊 Resultados agrupados:", groupedResults.length, "empresas");
-    if (groupedResults.length > 0) {
-      console.log(
-        "📋 Primer resultado agrupado:",
-        JSON.stringify(groupedResults[0], null, 2)
-      );
-    }
-
     return groupedResults;
   },
 
@@ -571,7 +549,7 @@ WHERE
         searchTerm: sanitizedTerm,
       };
     } catch (error) {
-      console.error("Error en searchEmployees:", error);
+      logError("Error en searchEmployees", error);
       throw error;
     }
   },
@@ -899,10 +877,8 @@ WHERE
             // }
           }
         } catch (error) {
-          console.error(
-            `Error al registrar el empleado ${employee.nombre} ${employee.apellido} (fila ${excelRowNumber(
-              index
-            )}):`,
+          logError(
+            `Error al registrar un empleado (fila ${excelRowNumber(index)})`,
             error
           );
           throw error;
@@ -916,8 +892,6 @@ WHERE
         queryLastIdDeclaration
       );
       const lastIdDeclaration = resultsLastIdDeclaration[0].lastId;
-      console.log(lastIdDeclaration);
-
       const monthNum = Number(month);
       const yearNum = Number(year);
 
@@ -929,12 +903,6 @@ WHERE
 
       // Crear la fecha de vencimiento como el último día del mes siguiente
       const dueDate = new Date(Date.UTC(dueYear, dueMonth, 0, 23, 59, 59));
-
-      console.log("Mes declaración:", monthNum);
-      console.log("Año declaración:", yearNum);
-      console.log("Mes vencimiento:", dueMonth);
-      console.log("Año vencimiento:", dueYear);
-      console.log("Fecha vencimiento:", dueDate.toISOString());
 
       const sueldobasico = `SELECT sueldo_basico FROM categorias WHERE id = 1`;
       const [resultsSueldoBasico] = await connection.query(sueldobasico);
@@ -1073,10 +1041,8 @@ WHERE
           amount += fas + aportes;
           contadorPersonas++;
         } catch (error) {
-          console.error(
-            `Error al calcular los aportes de ${employee.nombre} ${employee.apellido} (fila ${excelRowNumber(
-              index
-            )}):`,
+          logError(
+            `Error al calcular aportes (fila ${excelRowNumber(index)})`,
             error
           );
           throw error;
@@ -1131,12 +1097,7 @@ WHERE
       // seguía, así que el controlador recibía `undefined` y respondía
       // "Empleados importados con éxito" cuando en realidad no se guardó nada.
       await connection.rollback();
-      console.error(
-        "Error en la transacción:",
-        error,
-        ". El error ocurrio en la empresa con id: ",
-        companyId
-      );
+      logError("Error en la transacción de importación", error);
       throw error;
     } finally {
       // Cerramos la conexión

@@ -91,7 +91,6 @@ const loginController = {
 
     try {
       const result = await loginModel.loginEmpresa(email, password);
-      console.log(result);
       if (result.error) {
         return handleError(res, null, 401, result.message);
       }

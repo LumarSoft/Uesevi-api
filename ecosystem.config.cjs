@@ -13,9 +13,7 @@ module.exports = {
       kill_timeout: 5000, // Dar 5 segundos para cerrar limpiamente
       error_file: "logs/err.log",
       out_file: "logs/out.log",
-      log_file: "logs/combined.log",
       time: true,
-      merge_logs: true,
     },
   ],
 };

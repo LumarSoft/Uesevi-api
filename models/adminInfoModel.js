@@ -1,5 +1,6 @@
 import { pool } from "../db/db.js";
 import { format, isValid } from "date-fns";
+import { logError } from "../utils/safeLogging.js";
 
 const AdminModel = {
   getAll: async () => {
@@ -16,16 +17,10 @@ const AdminModel = {
           try {
             formattedCreated = format(date, "yyyy-MM-dd HH:mm:ss");
           } catch (error) {
-            console.error("Error formateando la fecha:", error);
+            logError("Error formateando la fecha", error);
           }
         } else {
-          console.warn(
-            "Fecha no válida:",
-            result.created,
-            "De el usuario: ",
-            result.nombre,
-            result.apellido
-          );
+          console.warn("Fecha de creación no válida en un usuario administrador");
         }
       }
 
@@ -39,7 +34,6 @@ const AdminModel = {
 
   update: async (id, adminData) => {
     const { firstName, lastName, email, phone } = adminData;
-    console.log(firstName, lastName, email, phone);
     try {
       const query = `UPDATE usuarios SET nombre = ?, apellido = ?, email = ?, telefono = ? WHERE id = ?`;
       const [results] = await pool.query(query, [
@@ -52,7 +46,7 @@ const AdminModel = {
 
       return results;
     } catch (error) {
-      console.error("Error al actualizar usuario:", error);
+      logError("Error al actualizar usuario", error);
       throw {
         status: 500,
         code: "INTERNAL_SERVER_ERROR",
@@ -91,7 +85,7 @@ const AdminModel = {
 
       return results;
     } catch (error) {
-      console.error("Error al añadir usuario:", error);
+      logError("Error al añadir usuario", error);
       if (error.code === "EMAIL_IN_USE") {
         throw {
           status: 400,

@@ -4,6 +4,7 @@ import {
   validateEmployees,
   buildErrorMessage,
 } from "../utils/employeeImportValidation.js";
+import { logError } from "../utils/safeLogging.js";
 
 // Función de manejo de errores
 const handleError = (
@@ -12,7 +13,7 @@ const handleError = (
   statusCode = 500,
   defaultMessage = "Error interno del servidor"
 ) => {
-  console.error("Error en el controlador:", error);
+  logError("Error en el controlador de declaraciones", error);
 
   // El mensaje va en el primer nivel: el front lee `result.message`. Antes
   // quedaba anidado dentro de `data` y el usuario veía "Error desconocido".
@@ -36,7 +37,7 @@ const handleError = (
 // Respuesta de validación: devuelve el detalle fila por fila del Excel.
 const validationError = (res, errors, statusCode = 422) => {
   const message = buildErrorMessage(errors);
-  console.warn("Validación de rectificación fallida:", errors);
+  console.warn(`Validación de rectificación fallida: ${errors.length} error(es)`);
 
   res.status(statusCode).json({
     ok: false,
@@ -172,8 +173,6 @@ const statementsController = {
         partial_payment
       );
 
-      console.log(result);
-
       if (result.affectedRows > 0) {
         response(
           res,
@@ -217,7 +216,6 @@ const statementsController = {
   },
 
   getDebtorCompanies: async (req, res, next) => {
-    console.log("hll");
     try {
       const debtorCompanies = await statementsModel.getDebtorCompanies();
       if (!debtorCompanies || debtorCompanies.length === 0) {
@@ -291,7 +289,7 @@ const statementsController = {
           error?.message || "error inesperado en el servidor"
         }`
       );
-      console.error("Error al rectificar la declaración:", error);
+      logError("Error al rectificar la declaración", error);
     }
   },
 
@@ -315,8 +313,7 @@ const statementsController = {
   deleteOne: async (req, res, next) => {
     try {
       const { id } = req.params;
-      const result = await statementsModel.deleteOne(id);
-      console.log(result);
+      await statementsModel.deleteOne(id);
       response(res, null, 200, "Declaración eliminada con éxito");
     } catch (error) {
       handleError(res, error);

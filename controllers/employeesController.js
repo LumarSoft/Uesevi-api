@@ -4,6 +4,7 @@ import {
   validateEmployees,
   buildErrorMessage,
 } from "../utils/employeeImportValidation.js";
+import { logError } from "../utils/safeLogging.js";
 
 // Función de manejo de errores
 const handleError = (
@@ -15,7 +16,7 @@ const handleError = (
   // Determina el mensaje final para enviar
   const message = error?.message || defaultMessage;
 
-  console.error("Error en el controlador:", error || message); // Log para depuración
+  logError("Error en el controlador de empleados", error || message);
 
   res.status(statusCode).json({
     ok: false,
@@ -30,7 +31,7 @@ const handleError = (
 // para que el front pueda listar exactamente qué corregir en el Excel.
 const validationError = (res, errors, statusCode = 422) => {
   const message = buildErrorMessage(errors);
-  console.warn("Validación de importación fallida:", errors);
+  console.warn(`Validación de importación fallida: ${errors.length} error(es)`);
 
   res.status(statusCode).json({
     ok: false,
@@ -257,7 +258,7 @@ const employeesController = {
           error?.message || "error inesperado en el servidor"
         }`
       );
-      console.error("Error al importar empleados:", error);
+      logError("Error al importar empleados", error);
     }
   },
 
@@ -331,12 +332,6 @@ const employeesController = {
         );
       }
 
-      console.log(
-        `🔍 Búsqueda de empleados: "${searchTerm}" (empresa: ${
-          parsedCompanyId || "todas"
-        })`
-      );
-
       // Ejecutar búsqueda
       const result = await employeesModel.searchEmployees(
         searchTerm.trim(),
@@ -371,7 +366,7 @@ const employeesController = {
         `Búsqueda completada: ${result.total} empleados encontrados`
       );
     } catch (error) {
-      console.error("❌ Error en búsqueda de empleados:", error);
+      logError("Error en búsqueda de empleados", error);
       handleError(res, error);
     }
   },
@@ -380,10 +375,7 @@ const employeesController = {
   getEmployeeHistory: async (req, res, next) => {
     try {
       const { empleadoId } = req.params;
-      console.log("🔍 Buscando historial para empleadoId:", empleadoId);
-
       const history = await employeesModel.getEmployeeHistory(empleadoId);
-      console.log("📋 Historial encontrado:", history.length, "registros");
 
       if (history.length === 0) {
         return response(
@@ -396,7 +388,7 @@ const employeesController = {
 
       response(res, history, 200, "Historial del empleado obtenido con éxito");
     } catch (error) {
-      console.error("❌ Error al obtener historial:", error);
+      logError("Error al obtener historial", error);
       handleError(res, error);
     }
   },
@@ -431,10 +423,9 @@ const employeesController = {
         totalContratos: contratosResult.length,
       };
 
-      console.log("🐛 Debug data:", debugData);
       response(res, debugData, 200, "Datos de debugging obtenidos");
     } catch (error) {
-      console.error("❌ Error en debugging:", error);
+      logError("Error en debugging de empleados", error);
       handleError(res, error);
     }
   },

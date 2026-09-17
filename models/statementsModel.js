@@ -3,6 +3,7 @@ import {
   isAfiliado,
   excelRowNumber,
 } from "../utils/employeeImportValidation.js";
+import { logError } from "../utils/safeLogging.js";
 
 const statementsModel = {
   getAll: async () => {
@@ -251,9 +252,7 @@ WHERE
     AND dj.year >= 2025
     GROUP BY dj.empresa_id, e.nombre, e.cuit
     `;
-    console.log("Ejecutando query de empresas deudoras...");
     const [results] = await pool.query(query);
-    console.log("Resultados obtenidos:", results);
     return results;
   },
 
@@ -310,8 +309,6 @@ WHERE
 
     // Calculamos el último día del mes de la declaración jurada (fecha de vencimiento original)
     const vencimientoOriginal = new Date(new Date().getFullYear(), mes + 1, 0); // último día del mes
-    console.log(vencimientoOriginal);
-
     // Pasamos la fecha que envía el usuario a un objeto Date
     const datePayment = new Date(date);
     datePayment.setDate(datePayment.getDate() + 1);
@@ -333,14 +330,7 @@ WHERE
       interesesRedondeado = parseFloat(intereses.toFixed(2));
       importe = parseFloat((subtotal + interesesRedondeado).toFixed(2));
 
-      console.log("Se pasó de la fecha de vencimiento en:", diffDays, "días");
-      console.log("Intereses calculados:", interesesRedondeado);
-    } else {
-      console.log("La fecha de pago está dentro del plazo de vencimiento.");
     }
-
-    console.log("Subtotal:", subtotal);
-    console.log("Importe final:", importe);
 
     // const datePaymentPlusOne = new Date(datePayment);
     // datePaymentPlusOne.setDate(datePaymentPlusOne.getDate() + 1);
@@ -497,10 +487,8 @@ WHERE
             ]);
           }
         } catch (error) {
-          console.error(
-            `Error al registrar el empleado ${employee.nombre} ${employee.apellido} (fila ${excelRowNumber(
-              index
-            )}):`,
+          logError(
+            `Error al registrar un empleado (fila ${excelRowNumber(index)})`,
             error
           );
           throw error;
@@ -532,12 +520,6 @@ WHERE
       yearDeclaration = resultMonthAndYear[0].year;
       vencimiento = resultMonthAndYear[0].vencimiento;
       rectificada = resultMonthAndYear[0].rectificada + 1;
-
-      console.log("Esta es una declaracion que se va a rectificar");
-      console.log(monthDeclaration);
-      console.log(yearDeclaration);
-      console.log(vencimiento);
-      console.log(rectificada);
 
       const sueldobasico = `SELECT sueldo_basico FROM categorias WHERE id = 1`;
       const [resultsSueldoBasico] = await connection.query(sueldobasico);
@@ -669,10 +651,8 @@ WHERE
           amount += fas + aportes;
           contadorPersonas++;
         } catch (error) {
-          console.error(
-            `Error al calcular los aportes de ${employee.nombre} ${employee.apellido} (fila ${excelRowNumber(
-              index
-            )}):`,
+          logError(
+            `Error al calcular aportes (fila ${excelRowNumber(index)})`,
             error
           );
           throw error;
@@ -728,12 +708,7 @@ WHERE
       // seguía, así que el controlador respondía "Declaración rectificada con
       // éxito" aunque el rollback había descartado todo.
       await connection.rollback();
-      console.error(
-        "Error en la transacción:",
-        error,
-        ". El error ocurrio en la empresa con id: ",
-        companyId
-      );
+      logError("Error en la transacción de rectificación", error);
       throw error;
     } finally {
       // Cerramos la conexión
@@ -782,11 +757,7 @@ WHERE
       // logueaba `companyId` (variable inexistente acá) y el borrado fallido se
       // reportaba como exitoso.
       await connection.rollback();
-      console.error(
-        "Error al eliminar la declaración con id:",
-        id,
-        error
-      );
+      logError("Error al eliminar una declaración", error);
       throw error;
     } finally {
       // La conexión quedaba tomada del pool en cada borrado.

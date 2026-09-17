@@ -24,8 +24,6 @@ const declaracionesViejasModel = {
   getInfo: async (idEmpresa, idDeclaracion) => {
     const query = `SELECT mes, year FROM old_declaraciones_juradas WHERE  old_empresa_id = ? AND id = ? `;
     const [result] = await pool.query(query, [idEmpresa, idDeclaracion]);
-    console.log(result);
-
         const query2 = `SELECT
         CONCAT(u.nombre, ' ', u.apellido) AS nombre_completo,
         CASE WHEN emp.sindicato_activo = 1 THEN 'Sí' ELSE 'No' END AS afiliado,

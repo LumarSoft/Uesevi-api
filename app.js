@@ -1,3 +1,4 @@
+import "./utils/installSafeConsole.js";
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -5,6 +6,11 @@ import http from "http";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
+import {
+  logError,
+  normalizeRequestPath,
+  shouldLogRequest,
+} from "./utils/safeLogging.js";
 
 import { pool } from "./db/db.js"; // Base de datos
 import "./cronJobs.js"; // Tareas programadas
@@ -73,29 +79,28 @@ const setupMiddleware = () => {
 
   app.use((req, res, next) => {
     const startTime = Date.now();
-    const url = req.originalUrl;
     const method = req.method;
-    
-    console.log(`🔹 Petición recibida: ${method} ${url}`);
-    
-    const originalSend = res.send;
-    res.send = function(body) {
-      const endTime = Date.now();
-      const duration = endTime - startTime;
-      
-      console.log(`✅ Respuesta enviada: ${method} ${url} - Status: ${res.statusCode} - Tiempo: ${duration}ms`);
-      
-      return originalSend.call(this, body);
-    };
-    
-    res.on('close', () => {
-      if (!res.writableEnded) {
-        const endTime = Date.now();
-        const duration = endTime - startTime;
-        console.log(`❌ Conexión cerrada sin respuesta: ${method} ${url} - Tiempo: ${duration}ms`);
+    const requestPath = normalizeRequestPath(req.path);
+    const logRequest = shouldLogRequest(requestPath);
+    let finished = false;
+
+    res.once("finish", () => {
+      finished = true;
+      if (logRequest) {
+        console.log(
+          `HTTP ${method} ${requestPath} status=${res.statusCode} durationMs=${Date.now() - startTime}`
+        );
       }
     });
-    
+
+    res.once("close", () => {
+      if (logRequest && !finished) {
+        console.warn(
+          `HTTP_ABORTED ${method} ${requestPath} durationMs=${Date.now() - startTime}`
+        );
+      }
+    });
+
     next();
   });
 
@@ -175,19 +180,17 @@ const findAvailablePort = (port) => {
       );
       findAvailablePort(port + 1);
     } else {
-      console.error("Error al intentar usar el puerto:", err);
+      logError("Error al intentar usar el puerto", err);
     }
   });
 };
 
 process.on("uncaughtException", (error) => {
-  console.error("Uncaught Exception:", error);
-  // Aquí puedes agregar lógica para registrar el error en un archivo de log
+  logError("Uncaught Exception", error);
 });
 
-process.on("unhandledRejection", (reason, promise) => {
-  console.error("Unhandled Rejection at:", promise, "reason:", reason);
-  // Aquí puedes agregar lógica para registrar el error en un archivo de log
+process.on("unhandledRejection", (reason) => {
+  logError("Unhandled Rejection", reason);
 });
 
 // Inicialización
