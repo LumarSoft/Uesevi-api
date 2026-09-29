@@ -362,9 +362,22 @@ WHERE
         throw new Error("Esta declaración ya fue rectificada. Actualizá la pantalla y rectificá la versión vigente.");
       }
 
-      // Hacemos una query para poner el campo deleted a todos los contratos activos de esa empresa en este momento
-      const queryDeleteEmployees = `UPDATE contratos SET deleted = NOW() WHERE empresa_id = ? AND deleted IS NULL;`;
-      await connection.query(queryDeleteEmployees, [companyId]);
+      // Una rectificación de un período anterior conserva el detalle histórico,
+      // pero la nómina vigente la define la declaración del período más reciente.
+      const [[periodo]] = await connection.query(
+        `SELECT EXISTS(
+           SELECT 1 FROM declaraciones_juradas
+           WHERE empresa_id = ? AND (year > ? OR (year = ? AND mes > ?))
+         ) AS tiene_periodo_posterior`,
+        [companyId, origen.year, origen.year, origen.mes]
+      );
+      const actualizaNominaVigente = !Number(periodo.tiene_periodo_posterior);
+      if (actualizaNominaVigente) {
+        await connection.query(
+          `UPDATE contratos SET deleted = NOW() WHERE empresa_id = ? AND deleted IS NULL;`,
+          [companyId]
+        );
+      }
 
       let amount = 0;
       // Recorremos cada empleado dentro del array de employees
@@ -437,7 +450,9 @@ WHERE
             const lastIdContract = resultsLastIdContract[0].lastId;
 
             // Insertamos el contrato
-            const queryInsertContract = `INSERT INTO contratos (id, empleado_id, empresa_id, estado, created, modified) VALUES (?, ?, ?, '1', NOW(), NOW());`;
+            const queryInsertContract = actualizaNominaVigente
+              ? `INSERT INTO contratos (id, empleado_id, empresa_id, estado, created, modified) VALUES (?, ?, ?, '1', NOW(), NOW());`
+              : `INSERT INTO contratos (id, empleado_id, empresa_id, estado, created, modified, deleted) VALUES (?, ?, ?, '1', NOW(), NOW(), NOW());`;
 
             await connection.query(queryInsertContract, [
               lastIdContract + 1,
@@ -450,19 +465,23 @@ WHERE
 
             // Actualizamos el empleado
             const queryUpdateEmployee = `UPDATE empleados SET categoria_id = ?, sindicato_activo = ? WHERE id = ?;`;
-            await connection.query(queryUpdateEmployee, [
-              categoryId,
-              isAfiliado(employee.adherido_a_sindicato) ? 1 : 0,
-              result.id,
-            ]);
+            if (actualizaNominaVigente) {
+              await connection.query(queryUpdateEmployee, [
+                categoryId,
+                isAfiliado(employee.adherido_a_sindicato) ? 1 : 0,
+                result.id,
+              ]);
+            }
 
             // Actualizamos el usuario
             const queryUpdateUser = `UPDATE usuarios SET nombre = ?, apellido = ?, modified = NOW(), deleted = null WHERE id = ?;`;
-            await connection.query(queryUpdateUser, [
-              employee.nombre,
-              employee.apellido,
-              result.usuario_id,
-            ]);
+            if (actualizaNominaVigente) {
+              await connection.query(queryUpdateUser, [
+                employee.nombre,
+                employee.apellido,
+                result.usuario_id,
+              ]);
+            }
 
             // Crear un nuevo contrato asociando al empleado con la empresa
             const queryLastIdContract = `SELECT MAX(id) as lastId FROM contratos`;
@@ -471,7 +490,9 @@ WHERE
             );
             const lastIdContract = resultsLastIdContract[0].lastId;
 
-            const queryInsertContract = `INSERT INTO contratos (id, empleado_id, empresa_id, estado, created, modified) VALUES (?, ?, ?, '1', NOW(), NOW());`;
+            const queryInsertContract = actualizaNominaVigente
+              ? `INSERT INTO contratos (id, empleado_id, empresa_id, estado, created, modified) VALUES (?, ?, ?, '1', NOW(), NOW());`
+              : `INSERT INTO contratos (id, empleado_id, empresa_id, estado, created, modified, deleted) VALUES (?, ?, ?, '1', NOW(), NOW(), NOW());`;
 
             await connection.query(queryInsertContract, [
               lastIdContract + 1,

@@ -967,6 +967,8 @@ const chatbotModel = {
           WHERE u.estado = '1' AND u.rol = 'empleado'
             AND c.estado = '1' AND c.deleted IS NULL
             AND em.estado = 'Activo') AS empleados_activos,
+        (SELECT COUNT(DISTINCT NULLIF(REGEXP_REPLACE(e.cuil, '[^0-9]', ''), ''))
+           FROM empleados e) AS personas_registradas_por_cuil,
         (SELECT COUNT(DISTINCT e.id)
            FROM empleados e
            JOIN usuarios u ON e.usuario_id = u.id
