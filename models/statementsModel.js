@@ -68,7 +68,13 @@ ORDER BY
     d.importe,
     d.sueldo_basico,
     d.estado,
-    d.ajuste
+    d.ajuste,
+    EXISTS(
+      SELECT 1 FROM declaraciones_juradas posterior
+      WHERE posterior.empresa_id = d.empresa_id
+        AND posterior.year = d.year AND posterior.mes = d.mes
+        AND posterior.rectificada > d.rectificada
+    ) AS es_version_anterior
 FROM declaraciones_juradas d
 INNER JOIN empresas e ON e.id = d.empresa_id
 WHERE d.id = ? AND d.empresa_id = ?`;
@@ -77,7 +83,9 @@ WHERE d.id = ? AND d.empresa_id = ?`;
 
     const query2 = `SELECT 
     COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u.apellido, u.nombre)), ''), 'Sin nombre en el padrón') AS nombre_completo,
-    CASE WHEN s.sindicato_activo = 1 THEN 'Sí' ELSE 'No' END AS afiliado,
+    CASE WHEN s.sindicato_activo = 1 THEN 'Sí'
+         WHEN s.sindicato_activo = 0 THEN 'No'
+         ELSE 'Sin dato' END AS afiliado,
     COALESCE(emp.cuil, 'CUIL sin registro') AS cuil,
     s.sueldo_basico,
     -- Presentismo CONGELADO al cargar la DDJJ. Las declaraciones anteriores al
@@ -173,7 +181,13 @@ WHERE
 
   getHistory: async (idEmpresa, year, month) => {
     const query = `
-      SELECT dj.*, e.nombre AS nombre_empresa, e.cuit AS cuit_empresa
+      SELECT dj.*, e.nombre AS nombre_empresa, e.cuit AS cuit_empresa,
+             EXISTS(
+               SELECT 1 FROM declaraciones_juradas posterior
+               WHERE posterior.empresa_id = dj.empresa_id
+                 AND posterior.year = dj.year AND posterior.mes = dj.mes
+                 AND posterior.rectificada > dj.rectificada
+             ) AS es_version_anterior
       FROM declaraciones_juradas dj
       INNER JOIN empresas e ON dj.empresa_id = e.id
       WHERE dj.empresa_id = ? AND dj.year = ? AND dj.mes = ?

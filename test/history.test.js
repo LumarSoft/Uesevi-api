@@ -54,7 +54,7 @@ test("el detalle histórico usa su propia declaración aunque no haya contratos 
   pool.query = async (sql) => {
     consultas.push(sql);
     if (sql.includes("FROM declaraciones_juradas d\nINNER JOIN empresas")) {
-      return [[{ id: 42, empresa_id: 7, nombre_empresa: "Empresa", cantidad_empleados_declaracion: 1, cantidad_afiliados_declaracion: 1, estado: 3, subtotal: 100 }]];
+      return [[{ id: 42, empresa_id: 7, nombre_empresa: "Empresa", cantidad_empleados_declaracion: 1, cantidad_afiliados_declaracion: 1, estado: 1, es_version_anterior: 1, subtotal: 100 }]];
     }
     if (sql.includes("FROM \n    sueldos s")) return [[{ nombre_completo: "Empleado", afiliado: "Sí", monto: 100 }]];
     return [[{ fas: 1, solidario: 2, sindical: 3, total: 6 }]];
@@ -62,12 +62,31 @@ test("el detalle histórico usa su propia declaración aunque no haya contratos 
   try {
     const detalle = await statementsModel.getInfo(7, 42);
     assert.equal(detalle.cantidad_empleados_declaracion, 1);
+    assert.equal(detalle.es_version_anterior, 1);
     assert.equal(detalle.empleados[0].nombre_completo, "Empleado");
     assert.deepEqual(detalle.desglose, { fas: 1, solidario: 2, sindical: 3, total: 6 });
     assert.match(consultas[0], /WHERE d\.id = \? AND d\.empresa_id = \?/);
+    assert.match(consultas[0], /posterior\.rectificada > d\.rectificada/);
     assert.doesNotMatch(consultas[0], /c\.deleted IS NULL/);
     assert.match(consultas[1], /LEFT JOIN\s+contratos c/);
     assert.match(consultas[1], /AND d\.empresa_id = \?/);
+    assert.match(consultas[1], /ELSE 'Sin dato' END AS afiliado/);
+  } finally {
+    pool.query = original;
+  }
+});
+
+test("el historial detecta versiones anteriores aunque el estado no sea 3", async () => {
+  const original = pool.query;
+  pool.query = async (sql, params) => {
+    assert.match(sql, /posterior\.rectificada > dj\.rectificada/);
+    assert.deepEqual(params, [7, 2024, 11]);
+    return [[{ id: 42, rectificada: 0, estado: 1, es_version_anterior: 1 }]];
+  };
+  try {
+    const historial = await statementsModel.getHistory(7, 2024, 11);
+    assert.equal(historial[0].estado, 1);
+    assert.equal(historial[0].es_version_anterior, 1);
   } finally {
     pool.query = original;
   }
