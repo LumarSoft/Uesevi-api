@@ -192,7 +192,7 @@ export const definicionesHerramientas = [
     type: "function",
     name: "buscar_empleado",
     description:
-      "Busca empleados por CUIL, nombre, apellido o email. Devuelve la empresa en la que está trabajando actualmente (contrato vigente), su categoría y si está afiliado al sindicato.",
+      "Busca empleados por CUIL, nombre, apellido o email. Devuelve sólo la empresa con contrato vigente, su categoría y afiliación. Para saber todas las empresas anteriores usá historial_empresas_empleado con el id encontrado.",
     parameters: {
       type: "object",
       properties: {
@@ -200,6 +200,17 @@ export const definicionesHerramientas = [
         limite: { type: "integer", description: "Default 15." },
       },
       required: ["texto"],
+    },
+  },
+  {
+    type: "function",
+    name: "historial_empresas_empleado",
+    description:
+      "Lista todas las empresas con contratos registrados para el CUIL de un empleado, incluso si existen varias fichas con ese CUIL. Agrupa contratos por empresa, indica si hay uno vigente y muestra los tramos de meses en que figura en declaraciones juradas vigentes. Puede incluir una fecha de ingreso registrada en el contrato. Usala para preguntas sobre dónde y cuándo trabajó; primero buscá al empleado.",
+    parameters: {
+      type: "object",
+      properties: { id_empleado: { type: "integer" } },
+      required: ["id_empleado"],
     },
   },
   {
@@ -378,6 +389,8 @@ export const describirHerramienta = (nombre, input = {}) => {
       return "Calculando la deuda con intereses a hoy";
     case "buscar_empleado":
       return `Buscando al empleado ${comillas(input.texto)}`;
+    case "historial_empresas_empleado":
+      return "Consultando las empresas registradas para el CUIL";
     case "listar_empleados_empresa":
       return "Listando los empleados de la empresa";
     case "empresas_deudoras":
@@ -430,6 +443,8 @@ export const resumirResultado = (nombre, resultado) => {
       return resultado.cantidad
         ? plural(resultado.cantidad, "empleado encontrado", "empleados encontrados")
         : "No encontré ningún empleado";
+    case "historial_empresas_empleado":
+      return plural(resultado.empresas?.length ?? 0, "empresa registrada", "empresas registradas");
     case "listar_empleados_empresa":
       return plural(resultado.total ?? resultado.cantidad ?? 0, "empleado", "empleados");
     case "empresas_deudoras":
@@ -638,6 +653,11 @@ export const ejecutarHerramienta = async (nombre, input, contexto) => {
         limit: input.limite ?? 15,
       });
       return { cantidad: empleados.length, empleados };
+    }
+
+    case "historial_empresas_empleado": {
+      const historial = await chatbotModel.employeeCompanyHistory(input.id_empleado);
+      return historial ?? { error: "No existe un empleado con ese id." };
     }
 
     case "listar_empleados_empresa": {

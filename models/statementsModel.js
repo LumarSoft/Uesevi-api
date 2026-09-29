@@ -51,8 +51,8 @@ ORDER BY
     const query = `SELECT 
     d.id,
     e.nombre AS nombre_empresa,
-    COUNT(DISTINCT emp.id) AS cantidad_empleados_declaracion,
-    COUNT(DISTINCT CASE WHEN emp.sindicato_activo = 1 THEN emp.id END) AS cantidad_afiliados_declaracion,
+    (SELECT COUNT(*) FROM sueldos s WHERE s.declaraciones_jurada_id = d.id) AS cantidad_empleados_declaracion,
+    (SELECT COUNT(*) FROM sueldos s WHERE s.declaraciones_jurada_id = d.id AND s.sindicato_activo = 1) AS cantidad_afiliados_declaracion,
     d.year,
     d.mes,
     -- Fecha en que se CARGÓ la declaración. Determina qué fórmula del aporte
@@ -64,28 +64,21 @@ ORDER BY
     d.fecha_pago,
     d.pago_parcial,
     d.subtotal,
+    d.interes,
+    d.importe,
     d.sueldo_basico,
     d.estado,
     d.ajuste
-FROM 
-    contratos c
-INNER JOIN 
-    empleados emp ON c.empleado_id = emp.id
-INNER JOIN 
-    usuarios u ON emp.usuario_id = u.id
-INNER JOIN 
-    empresas e ON c.empresa_id = e.id
-INNER JOIN 
-    declaraciones_juradas d ON d.id = ?
-WHERE 
-    c.empresa_id = ?
-    AND c.deleted IS NULL`;
+FROM declaraciones_juradas d
+INNER JOIN empresas e ON e.id = d.empresa_id
+WHERE d.id = ? AND d.empresa_id = ?`;
     const [result] = await pool.query(query, [idDeclaracion, idEmpresa]);
+    if (!result.length) return null;
 
     const query2 = `SELECT 
-    CONCAT(u.apellido, ' ', u.nombre) AS nombre_completo, 
-    CASE WHEN emp.sindicato_activo = 1 THEN 'Sí' ELSE 'No' END AS afiliado,
-    emp.cuil,
+    COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u.apellido, u.nombre)), ''), 'Sin nombre en el padrón') AS nombre_completo,
+    CASE WHEN s.sindicato_activo = 1 THEN 'Sí' ELSE 'No' END AS afiliado,
+    COALESCE(emp.cuil, 'CUIL sin registro') AS cuil,
     s.sueldo_basico,
     -- Presentismo CONGELADO al cargar la DDJJ. Las declaraciones anteriores al
     -- cambio no tienen el dato (NULL) y muestran 0: es correcto, en ese momento
@@ -94,26 +87,26 @@ WHERE
     s.monto,
     s.remunerativo_adicional,
     s.adicional_norem AS suma_no_remunerativa,
-    c2.nombre AS categoria,
+    COALESCE(c2.nombre, 'Categoría sin registro') AS categoria,
     s.adicional,
     (s.sueldo_basico + s.remunerativo_adicional + s.adicional_norem + s.adicional) AS total_bruto
 FROM 
     sueldos s
 INNER JOIN 
     declaraciones_juradas d ON s.declaraciones_jurada_id = d.id
-INNER JOIN 
+LEFT JOIN
     contratos c ON s.contrato_id = c.id
-INNER JOIN 
+LEFT JOIN
     empleados emp ON c.empleado_id = emp.id
-INNER JOIN 
+LEFT JOIN
     usuarios u ON emp.usuario_id = u.id
-INNER JOIN 
+LEFT JOIN
     categorias c2 ON s.categoria_id = c2.id
 WHERE 
     d.id = ?
-    AND c.empresa_id = ?
+    AND d.empresa_id = ?
     ORDER BY 
-    emp.sindicato_activo DESC,  
+    s.sindicato_activo DESC,
     u.apellido ASC;       
 
 `;
@@ -184,7 +177,7 @@ WHERE
       FROM declaraciones_juradas dj
       INNER JOIN empresas e ON dj.empresa_id = e.id
       WHERE dj.empresa_id = ? AND dj.year = ? AND dj.mes = ?
-      ORDER BY dj.modified DESC
+      ORDER BY dj.rectificada DESC, dj.id DESC
     `;
     const [results] = await pool.query(query, [idEmpresa, year, month]);
     return results;
@@ -335,6 +328,26 @@ WHERE
         return { status: "NO_EMPLOYEES" };
       }
 
+      // Comprobamos el origen antes de tocar contratos. Si dos cargas usan una
+      // pantalla vieja, sólo la versión vigente puede generar la siguiente.
+      const [origenRows] = await connection.query(
+        `SELECT empresa_id, mes, year, vencimiento, rectificada
+         FROM declaraciones_juradas WHERE id = ? AND empresa_id = ? FOR UPDATE;`,
+        [statementId, companyId]
+      );
+      if (!origenRows.length) {
+        throw new Error("La declaración de origen no pertenece a esta empresa.");
+      }
+      const origen = origenRows[0];
+      const [[ultima]] = await connection.query(
+        `SELECT MAX(rectificada) AS rectificada
+         FROM declaraciones_juradas WHERE empresa_id = ? AND mes = ? AND year = ?;`,
+        [companyId, origen.mes, origen.year]
+      );
+      if (Number(origen.rectificada) !== Number(ultima.rectificada)) {
+        throw new Error("Esta declaración ya fue rectificada. Actualizá la pantalla y rectificá la versión vigente.");
+      }
+
       // Hacemos una query para poner el campo deleted a todos los contratos activos de esa empresa en este momento
       const queryDeleteEmployees = `UPDATE contratos SET deleted = NOW() WHERE empresa_id = ? AND deleted IS NULL;`;
       await connection.query(queryDeleteEmployees, [companyId]);
@@ -475,19 +488,14 @@ WHERE
       let vencimiento;
       let rectificada;
       // Ya que esto es una rectificacion tenemos que insertar dentro de declaracion jurada el mismo mes y anio que la recibimos el id
-      const queryGetMonthAndYear = `SELECT mes, year,vencimiento,rectificada FROM declaraciones_juradas WHERE id = ?`;
-      const [resultMonthAndYear] = await connection.query(
-        queryGetMonthAndYear,
-        statementId
-      );
       // query para cambiar el estado de la declaracion jurada ya rectificada a 3
       const queryChangeState = `UPDATE declaraciones_juradas SET estado = 3 WHERE id = ?`;
       await connection.query(queryChangeState, [statementId]);
 
-      monthDeclaration = resultMonthAndYear[0].mes;
-      yearDeclaration = resultMonthAndYear[0].year;
-      vencimiento = resultMonthAndYear[0].vencimiento;
-      rectificada = resultMonthAndYear[0].rectificada + 1;
+      monthDeclaration = origen.mes;
+      yearDeclaration = origen.year;
+      vencimiento = origen.vencimiento;
+      rectificada = Number(origen.rectificada) + 1;
 
       console.log("Esta es una declaracion que se va a rectificar");
       console.log(monthDeclaration);
@@ -703,6 +711,18 @@ WHERE
     await connection.beginTransaction();
 
     try {
+      const [versiones] = await connection.query(
+        `SELECT COUNT(*) AS total, MAX(d.rectificada) AS ultima_rectificacion
+         FROM declaraciones_juradas d
+         INNER JOIN declaraciones_juradas origen
+           ON origen.empresa_id = d.empresa_id AND origen.mes = d.mes AND origen.year = d.year
+         WHERE origen.id = ?;`,
+        [id]
+      );
+      if (Number(versiones[0]?.total) > 1 || Number(versiones[0]?.ultima_rectificacion) > 0) {
+        throw new Error("No se puede eliminar una declaración con rectificaciones: se debe conservar su historial.");
+      }
+
       //Primero tenemos que saber cual es la ultima declaracion de la empresa, sin contar la que estamos borrando
       const queryLastDeclaration = `SELECT MAX(id) as lastId FROM declaraciones_juradas WHERE empresa_id = (SELECT empresa_id FROM declaraciones_juradas WHERE id = ?) AND id != ?;`;
 

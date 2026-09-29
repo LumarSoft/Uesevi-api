@@ -673,6 +673,114 @@ const chatbotModel = {
     }));
   },
 
+  // Un mismo CUIL puede tener más de un registro de empleado. Los contratos
+  // reemplazados al cargar DDJJ también quedan con deleted, así que agrupamos
+  // por empresa y no interpretamos cada baja de contrato como baja laboral.
+  employeeCompanyHistory: async (empleadoId) => {
+    const [empleados] = await pool.query(
+      `SELECT id, cuil FROM empleados WHERE id = ?;`,
+      [empleadoId]
+    );
+    if (!empleados.length) return null;
+    const cuil = soloDigitos(empleados[0].cuil);
+    if (!cuil) return { cuil: empleados[0].cuil, registros_empleado: [empleadoId], empresas: [] };
+
+    const [registros] = await pool.query(
+      `SELECT id FROM empleados
+       WHERE REPLACE(REPLACE(cuil, '-', ''), ' ', '') = ?
+       ORDER BY id;`,
+      [cuil]
+    );
+    const ids = registros.length ? registros.map((registro) => registro.id) : [empleadoId];
+    const [contratos] = await pool.query(
+      `SELECT emp.id AS empleado_id, c.id AS contrato_id, c.empresa_id,
+              e.nombre AS empresa, e.cuit AS cuit_empresa,
+              c.estado, c.deleted, c.fecha_ingreso
+       FROM contratos c
+       INNER JOIN empleados emp ON emp.id = c.empleado_id
+       INNER JOIN empresas e ON e.id = c.empresa_id
+       WHERE c.empleado_id IN (${ids.map(() => "?").join(", ")})
+       ORDER BY c.id DESC;`,
+      ids
+    );
+
+    const empresas = new Map();
+    for (const contrato of contratos) {
+      if (!empresas.has(contrato.empresa_id)) {
+        empresas.set(contrato.empresa_id, {
+          empresa_id: contrato.empresa_id,
+          empresa: contrato.empresa,
+          cuit_empresa: contrato.cuit_empresa,
+          vigente: false,
+          fecha_ingreso_registrada: null,
+          contratos_registrados: 0,
+          registros_empleado: [],
+        });
+      }
+      const empresa = empresas.get(contrato.empresa_id);
+      empresa.contratos_registrados += 1;
+      if (!empresa.registros_empleado.includes(contrato.empleado_id)) {
+        empresa.registros_empleado.push(contrato.empleado_id);
+      }
+      if (contrato.deleted === null && String(contrato.estado) === "1") {
+        empresa.vigente = true;
+      }
+      const fechaIngreso = fechaISO(contrato.fecha_ingreso);
+      if (fechaIngreso && (!empresa.fecha_ingreso_registrada || fechaIngreso < empresa.fecha_ingreso_registrada)) {
+        empresa.fecha_ingreso_registrada = fechaIngreso;
+      }
+    }
+
+    // Un contrato puede cerrarse y recrearse con cada DDJJ. Para responder
+    // "cuándo", usamos los meses en cuya versión vigente se declaró a la
+    // persona; no convertimos created/deleted del contrato en fechas laborales.
+    const [periodos] = await pool.query(
+      `SELECT c.empresa_id, dj.year, dj.mes
+       FROM sueldos s
+       INNER JOIN contratos c ON c.id = s.contrato_id
+       INNER JOIN declaraciones_juradas dj
+         ON dj.id = s.declaraciones_jurada_id AND dj.empresa_id = c.empresa_id
+       WHERE c.empleado_id IN (${ids.map(() => "?").join(", ")})
+         AND dj.rectificada = (
+           SELECT MAX(d2.rectificada) FROM declaraciones_juradas d2
+           WHERE d2.empresa_id = dj.empresa_id AND d2.year = dj.year AND d2.mes = dj.mes
+         )
+       GROUP BY c.empresa_id, dj.year, dj.mes
+       ORDER BY c.empresa_id, dj.year, dj.mes;`,
+      ids
+    );
+    const mesesPorEmpresa = new Map();
+    for (const fila of periodos) {
+      const empresaId = Number(fila.empresa_id);
+      const year = Number(fila.year);
+      const mes = Number(fila.mes);
+      if (!empresas.has(empresaId) || !Number.isInteger(year) || !Number.isInteger(mes) || mes < 1 || mes > 12) continue;
+      if (!mesesPorEmpresa.has(empresaId)) mesesPorEmpresa.set(empresaId, new Set());
+      mesesPorEmpresa.get(empresaId).add(year * 12 + mes - 1);
+    }
+    const mostrarMes = (indice) => `${indice % 12 + 1}/${Math.floor(indice / 12)}`;
+    for (const empresa of empresas.values()) {
+      const meses = [...(mesesPorEmpresa.get(Number(empresa.empresa_id)) ?? [])].sort((a, b) => a - b);
+      const tramos = [];
+      for (const indice of meses) {
+        const ultimo = tramos.at(-1);
+        if (ultimo && indice === ultimo.fin + 1) ultimo.fin = indice;
+        else tramos.push({ inicio: indice, fin: indice });
+      }
+      empresa.meses_declarados = meses.length;
+      empresa.tramos_declarados = tramos.map(({ inicio, fin }) => ({
+        desde: mostrarMes(inicio),
+        hasta: mostrarMes(fin),
+      }));
+    }
+    return {
+      cuil: empleados[0].cuil,
+      registros_empleado: ids,
+      empresas: [...empresas.values()].sort((a, b) => Number(b.vigente) - Number(a.vigente) || a.empresa.localeCompare(b.empresa)),
+      nota: "Los tramos son meses en los que figura en la versión vigente de las declaraciones juradas, no fechas exactas de ingreso o egreso. Las brechas no prueban que haya dejado de trabajar. fecha_ingreso_registrada se muestra sólo si consta en un contrato. Los contratos se recrean al cargar declaraciones: deleted no prueba una baja laboral.",
+    };
+  },
+
   listCompanyEmployees: async ({ empresaId, soloActivos = true, limit = 100 }) => {
     const filtro = soloActivos ? "AND c.deleted IS NULL AND c.estado = '1'" : "";
     const query = `
