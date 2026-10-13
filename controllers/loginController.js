@@ -1,5 +1,6 @@
 import loginModel from "../models/loginModel.js";
 import { transporter } from "../mailer.js";
+import { EMAIL_COMPARTIDO_MESSAGE } from "../utils/accountUtils.js";
 
 // Función de manejo de errores
 const handleError = (
@@ -110,9 +111,14 @@ const loginController = {
 
     try {
       // Verificar que el email existe en la base de datos
-      const exists = await loginModel.checkEmpresaEmail(email);
-      if (!exists) {
+      const count = await loginModel.countEmpresaUsersByEmail(email);
+      if (count === 0) {
         return handleError(res, null, 404, "No existe una cuenta con este correo electrónico");
+      }
+      // Email compartido entre empresas: no se puede saber a cuál cambiarle
+      // la clave. Hay que separar los emails (lo hace UESEVI / soporte).
+      if (count > 1) {
+        return handleError(res, null, 409, EMAIL_COMPARTIDO_MESSAGE);
       }
 
       // Generar código aleatorio

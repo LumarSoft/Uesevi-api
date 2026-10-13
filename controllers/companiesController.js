@@ -1,6 +1,12 @@
 import companiesModel from "../models/companiesModel.js";
 import bcrypt from "bcrypt";
 import { sendNewCompanyNotification } from "../utils/utils.js";
+import {
+  EMAIL_DUPLICADO,
+  EMAIL_DUPLICADO_MESSAGE,
+  isValidEmail,
+  normalizeEmail,
+} from "../utils/accountUtils.js";
 
 // Función de manejo de errores
 const handleError = (
@@ -15,7 +21,7 @@ const handleError = (
     status: "error",
     statusCode,
     message: defaultMessage,
-    error: error.message || null, // Detalles del error para depuración
+    error: error?.message || null, // Detalles del error para depuración
   });
 };
 
@@ -91,9 +97,10 @@ const companiesController = {
         contactLastName,
         contactPhone,
         contactEmail,
-        username,
         password,
       } = req.body;
+      // El "usuario" del alta es el email de acceso: se guarda normalizado.
+      const username = normalizeEmail(req.body.username);
 
       // Validación de campos obligatorios
       if (
@@ -111,6 +118,15 @@ const companiesController = {
           null,
           400,
           "Todos los campos son obligatorios."
+        );
+      }
+
+      if (!isValidEmail(username)) {
+        return handleError(
+          res,
+          null,
+          400,
+          "El email de acceso no es un correo electrónico válido."
         );
       }
 
@@ -156,6 +172,9 @@ const companiesController = {
       // Respuesta exitosa
       response(res, null, 201, "Empresa creada con éxito");
     } catch (error) {
+      if (error.code === EMAIL_DUPLICADO) {
+        return handleError(res, error, 409, EMAIL_DUPLICADO_MESSAGE);
+      }
       handleError(res, error);
     }
   },

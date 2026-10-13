@@ -1,6 +1,14 @@
 import { pool } from "../db/db.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import { pickEmpresaUser, EMAIL_COMPARTIDO_MESSAGE } from "../utils/accountUtils.js";
+
+// Usuarios empresa activos con ese email, en orden estable. usuarios.email no
+// tiene UNIQUE: en datos viejos puede haber más de uno (o uno eliminado).
+const EMPRESA_USERS_BY_EMAIL = `
+  SELECT * FROM usuarios
+  WHERE email = ? AND rol = "empresa" AND deleted IS NULL
+  ORDER BY id`;
 
 const loginModel = {
   // Función para comparar contraseñas
@@ -72,25 +80,30 @@ const loginModel = {
     try {
       await connection.beginTransaction(); // Iniciar la transacción
 
-      const query = `SELECT * FROM usuarios WHERE email = ? AND rol = "empresa"`;
-      const [results] = await connection.query(query, [email]);
+      const [candidates] = await connection.query(EMPRESA_USERS_BY_EMAIL, [
+        email,
+      ]);
 
-      if (results.length === 0) {
-        return { error: true, message: "El correo electrónico no existe" };
-      }
-
-      const user = results[0];
-
-      const passwordMatch = await loginModel.comparePassword(
-        password,
-        user.password
+      // Si el email está repetido, sólo entra el usuario cuya contraseña
+      // coincide. Antes se tomaba results[0] sin ORDER BY y una empresa podía
+      // terminar logueada en la otra.
+      const picked = await pickEmpresaUser(candidates, (candidate) =>
+        loginModel.comparePassword(password, candidate.password)
       );
 
-      if (!passwordMatch) {
+      if (picked.error === "NO_EXISTE") {
+        return { error: true, message: "El correo electrónico no existe" };
+      }
+      if (picked.error === "PASSWORD") {
         return { error: true, message: "Contraseña incorrecta" };
       }
+      if (picked.error === "AMBIGUO") {
+        return { error: true, message: EMAIL_COMPARTIDO_MESSAGE };
+      }
 
-      const queryEmpresa = `SELECT * FROM empresas WHERE usuario_id = ?`;
+      const user = picked.user;
+
+      const queryEmpresa = `SELECT * FROM empresas WHERE usuario_id = ? ORDER BY id LIMIT 1`;
       const [resultsEmpresa] = await connection.query(queryEmpresa, [user.id]);
 
       if (resultsEmpresa.length === 0) {
@@ -131,21 +144,19 @@ const loginModel = {
     }
   },
 
-  // Verificar si existe un email de empresa
-  checkEmpresaEmail: async (email) => {
-    const connection = await pool.getConnection();
-    try {
-      const query = `SELECT COUNT(*) as count FROM usuarios WHERE email = ? AND rol = "empresa"`;
-      const [results] = await connection.query(query, [email]);
-      
-      return results[0].count > 0;
-    } catch (error) {
-      console.error("Error al verificar email de empresa:", error);
-      throw new Error("Error al verificar email de empresa");
-    } finally {
-      connection.release();
-    }
+  // Cantidad de usuarios empresa activos con ese email (0, 1 o más si el
+  // email quedó compartido entre empresas).
+  countEmpresaUsersByEmail: async (email) => {
+    const [results] = await pool.query(
+      `SELECT COUNT(*) AS count FROM usuarios WHERE email = ? AND rol = "empresa" AND deleted IS NULL`,
+      [email]
+    );
+    return Number(results[0].count);
   },
+
+  // Verificar si existe un email de empresa
+  checkEmpresaEmail: async (email) =>
+    (await loginModel.countEmpresaUsersByEmail(email)) > 0,
 
   // Actualizar contraseña de empresa
   updateEmpresaPassword: async (email, newPassword) => {
@@ -153,11 +164,15 @@ const loginModel = {
     try {
       await connection.beginTransaction();
 
-      // Verificar que el usuario existe y es una empresa
-      const queryCheck = `SELECT id FROM usuarios WHERE email = ? AND rol = "empresa"`;
-      const [results] = await connection.query(queryCheck, [email]);
-      
-      if (results.length === 0) {
+      // Verificar que el email identifica a UNA sola empresa. Antes el UPDATE
+      // era "WHERE email = ?" y cambiaba la clave de todos los usuarios con
+      // ese email (incluso de otras empresas).
+      const [results] = await connection.query(
+        `SELECT id FROM usuarios WHERE email = ? AND rol = "empresa" AND deleted IS NULL`,
+        [email]
+      );
+
+      if (results.length !== 1) {
         await connection.rollback();
         return false;
       }
@@ -165,9 +180,9 @@ const loginModel = {
       // Hashear la nueva contraseña
       const hashedPassword = await loginModel.hashPassword(newPassword);
 
-      // Actualizar la contraseña
-      const queryUpdate = `UPDATE usuarios SET password = ? WHERE email = ?`;
-      await connection.query(queryUpdate, [hashedPassword, email]);
+      // Actualizar la contraseña sólo de ese usuario
+      const queryUpdate = `UPDATE usuarios SET password = ?, modified = NOW() WHERE id = ? AND rol = "empresa"`;
+      await connection.query(queryUpdate, [hashedPassword, results[0].id]);
 
       await connection.commit();
       return true;

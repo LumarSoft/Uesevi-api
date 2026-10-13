@@ -35,6 +35,7 @@ import inquiriesRouter from "./routes/inquiriesRoute.js";
 import newsRouter from "./routes/newsRoute.js";
 import basicSalaryRouter from "./routes/basicSalaryRoute.js";
 import paymentsPanelRouter from "./routes/paymentsPanelRoute.js";
+import accountRouter from "./routes/accountRoute.js";
 
 const app = express();
 const startingPort = process.env.PORT || 3010; // Usar variable de entorno para el puerto
@@ -156,6 +157,7 @@ const setupRoutes = () => {
   app.use("/old-companies", oldCompaniesRouter);
   app.use("/basicSalary", basicSalaryRouter);
   app.use("/payments-panel", paymentsPanelRouter);
+  app.use("/account", accountRouter); // "Mi cuenta" de la empresa logueada
 };
 
 // Función para encontrar un puerto disponible

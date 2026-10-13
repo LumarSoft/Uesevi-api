@@ -1,5 +1,6 @@
 import { pool } from "../db/db.js";
 import { formatDate } from "../utils/utils.js";
+import { EMAIL_DUPLICADO, emailDuplicadoError } from "../utils/accountUtils.js";
 
 const companiesModel = {
   getAll: async () => {
@@ -83,6 +84,17 @@ const companiesModel = {
     try {
       await connection.beginTransaction(); // Inicia la transacción
 
+      // El email de acceso identifica a la empresa en el login y en la
+      // recuperación de contraseña: no puede repetirse entre empresas activas.
+      // (usuarios.email no tiene UNIQUE, se valida acá.)
+      const [existing] = await connection.query(
+        `SELECT id FROM usuarios WHERE email = ? AND rol = "empresa" AND deleted IS NULL LIMIT 1`,
+        [username]
+      );
+      if (existing.length > 0) {
+        throw emailDuplicadoError();
+      }
+
       const queryLastIdUsuario = `SELECT id FROM usuarios ORDER BY id DESC LIMIT 1`;
 
       const [resultLastIdUsuario] = await connection.query(queryLastIdUsuario);
@@ -125,6 +137,7 @@ const companiesModel = {
       return { message: "Empresa creada exitosamente" };
     } catch (error) {
       await connection.rollback(); // Revierte la transacción si hay un error
+      if (error.code === EMAIL_DUPLICADO) throw error;
       console.error(error);
       throw new Error("Error al crear la empresa: " + error.message);
     } finally {
