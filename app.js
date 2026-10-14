@@ -47,6 +47,8 @@ const __dirname = path.dirname(__filename);
 // Orígenes permitidos (front de producción y desarrollo local)
 const allowedOrigins = [
   "https://uesevi.org.ar",
+  "https://www.uesevi.org.ar",
+  "http://www.uesevi.org.ar",
   "http://localhost:3000",
 ];
 
